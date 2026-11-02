@@ -105,44 +105,71 @@ int main(void)
         float dt = GetFrameTime();
         Sala s = mapa[salaActual];
 
-        // Input de movimiento
+        // 1. GUARDAR LA POSICIÓN ANTES DEL MOVIMIENTO
+        // Si el jugador choca, lo devolveremos a estas coordenadas para bloquearlo
+        float antiguoX = jugadorX;
+        float antiguoY = jugadorY;
+
+        // 2. CAPTURAR EL INPUT DEL USUARIO
         if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) jugadorX += velocidad * dt;
         if (IsKeyDown(KEY_LEFT)  || IsKeyDown(KEY_A)) jugadorX -= velocidad * dt;
         if (IsKeyDown(KEY_DOWN)  || IsKeyDown(KEY_S)) jugadorY -= velocidad * dt; 
         if (IsKeyDown(KEY_UP)    || IsKeyDown(KEY_W)) jugadorY += velocidad * dt;
 
-        // --- DETECCIÓN DE TRANSICIÓN INTEGRADA UNO A UNO ---
+        // 3. SISTEMA DE COLISIONES DINÁMICAS CONTRA MUROS CIEGOS
         bool cambiadoDeSala = false;
         Puerta puertaCruzada;
 
+        // --- COLISIÓN EN MURO IZQUIERDO (X < 0) ---
         if (jugadorX < 0) {
+            bool enHuecoPuerta = false;
             for (int i = 0; i < s.cantidadPuertas; i++) {
                 Puerta p = s.puertas[i];
+                // Comprobamos si el jugador está alineado con el rango físico de la puerta
                 if (p.muro == MURO_IZQUIERDO && jugadorY >= (p.posicion - p.ancho/2.0f) && jugadorY <= (p.posicion + p.ancho/2.0f)) {
-                    puertaCruzada = p; cambiadoDeSala = true; break;
+                    puertaCruzada = p;
+                    cambiadoDeSala = true;
+                    enHuecoPuerta = true;
+                    break;
                 }
             }
-            if (!cambiadoDeSala) jugadorX = 0;
+            // Si chocó contra el muro y NO era una puerta, anulamos el movimiento horizontal
+            if (!enHuecoPuerta) jugadorX = antiguoX; 
         }
+        
+        // --- COLISIÓN EN MURO DERECHO (X > s.ancho) ---
         if (jugadorX > s.ancho && !cambiadoDeSala) {
+            bool enHuecoPuerta = false;
             for (int i = 0; i < s.cantidadPuertas; i++) {
                 Puerta p = s.puertas[i];
                 if (p.muro == MURO_DERECHO && jugadorY >= (p.posicion - p.ancho/2.0f) && jugadorY <= (p.posicion + p.ancho/2.0f)) {
-                    puertaCruzada = p; cambiadoDeSala = true; break;
+                    puertaCruzada = p;
+                    cambiadoDeSala = true;
+                    enHuecoPuerta = true;
+                    break;
                 }
             }
-            if (!cambiadoDeSala) jugadorX = s.ancho;
+            if (!enHuecoPuerta) jugadorX = antiguoX;
         }
+
+        // --- COLISIÓN EN MURO DEL FONDO (Y > s.largo) ---
         if (jugadorY > s.largo && !cambiadoDeSala) {
+            bool enHuecoPuerta = false;
             for (int i = 0; i < s.cantidadPuertas; i++) {
                 Puerta p = s.puertas[i];
                 if (p.muro == MURO_FONDO && jugadorX >= (p.posicion - p.ancho/2.0f) && jugadorX <= (p.posicion + p.ancho/2.0f)) {
-                    puertaCruzada = p; cambiadoDeSala = true; break;
+                    puertaCruzada = p;
+                    cambiadoDeSala = true;
+                    enHuecoPuerta = true;
+                    break;
                 }
             }
-            if (!cambiadoDeSala) jugadorY = s.largo;
+            if (!enHuecoPuerta) jugadorY = antiguoY;
         }
-        if (jugadorY < 0) jugadorY = 0;
+
+        // --- COLISIÓN EN EL FRENTE DE LA SALA (Y < 0) ---
+        // En Dragontorc el frente está abierto visualmente pero bloqueado físicamente para no caer al vacío
+        if (jugadorY < 0) jugadorY = antiguoY;
 
         // --- PROCESAMIENTO DE LA APARICIÓN EN LA PAREJA DE LA PUERTA ---
         if (cambiadoDeSala) {
