@@ -205,36 +205,39 @@ int main(void) {
         jugadorX = antiguoX;
     }
 
-    // --- COLISIÓN EN MURO DEL FONDO (Y > s.largo) ---
-    // Aplicamos el margen de entrada a la puerta de +15.0f que calibramos ayer
-    if (jugadorY > (s.largo + 15.0f) && !cambiadoDeSala) {
+    // --- COLISIÓN EN MURO DEL FONDO (ZONA CENTRAL ESTRICTA) ---
+    if (jugadorY > s.largo && !cambiadoDeSala) {
       bool enHuecoPuerta = false;
-      for (int i = 0; i < s.cantidadPuertas; i++) {
-        Puerta p = s.puertas[i];
-        if (p.muro == MURO_FONDO && jugadorX >= (p.posicion - p.ancho / 2.0f) &&
-            jugadorX <= (p.posicion + p.ancho / 2.0f)) {
-          puertaCruzada = p;
-          cambiadoDeSala = true;
-          enHuecoPuerta = true;
-          break;
-        }
-      }
-      if (!enHuecoPuerta)
-        jugadorY = antiguoY;
-    } else if (jugadorY > s.largo && !cambiadoDeSala) {
-      bool enHuecoPuerta = false;
-      for (int i = 0; i < s.cantidadPuertas; i++) {
-        Puerta p = s.puertas[i];
-        if (p.muro == MURO_FONDO && jugadorX >= (p.posicion - p.ancho / 2.0f) &&
-            jugadorX <= (p.posicion + p.ancho / 2.0f)) {
-          enHuecoPuerta = true;
-          break;
-        }
-      }
-      if (!enHuecoPuerta)
-        jugadorY = antiguoY;
-    }
 
+      for (int i = 0; i < s.cantidadPuertas; i++) {
+        Puerta p = s.puertas[i];
+        if (p.muro == MURO_FONDO) {
+          // Reducimos el ancho de colisión efectivo a la mitad (ancho / 4.0f a
+          // cada lado) Así obligamos a pasar obligatoriamente por el CENTRO
+          // real de la puerta
+          float margenCentralX = p.ancho / 4.0f;
+
+          if (jugadorX >= (p.posicion - margenCentralX) &&
+              jugadorX <= (p.posicion + margenCentralX)) {
+            enHuecoPuerta = true;
+
+            // Activamos la transición SOLO si la sombra se adentra físicamente
+            // en la profundidad del dintel (+8 píxeles del radio de la elipse)
+            if (jugadorY > (s.largo + 8.0f)) {
+              puertaCruzada = p;
+              cambiadoDeSala = true;
+            }
+            break;
+          }
+        }
+      }
+
+      // Si no está en el centro de la puerta o choca con muro ciego, se detiene
+      // en seco en el dintel
+      if (!enHuecoPuerta) {
+        jugadorY = s.largo;
+      }
+    }
     // --- COLISIÓN EN EL FRENTE DE LA SALA (Y < 0) ---
     if (jugadorY < 0)
       jugadorY = antiguoY;
