@@ -16,6 +16,12 @@ float tiempoLevitacion =
     0.0f; // Temporizador para la oscilación suave (bobbing)
 float desfaseFlotando = 0.0f;
 
+// Variables para el rebote físico gradual
+float reboteFuerzaX = 0.0f;
+float reboteFuerzaY = 0.0f;
+float tiempoBloqueoRebote =
+    0.0f; // Si es mayor que 0, el jugador no tiene el control
+
 typedef enum { MURO_IZQUIERDO, MURO_FONDO, MURO_DERECHO } TipoMuro;
 typedef enum { PUERTA_ABIERTA, PUERTA_CERRADA, SALIDA_LIBRE } EstadoPuerta;
 
@@ -128,33 +134,47 @@ int main(void) {
     float antiguoX = jugadorX;
     float antiguoY = jugadorY;
 
-    // 2. CAPTURAR EL INPUT DEL USUARIO (X REDUCIDA Y DIAGONALES CALIBRADAS)
+    // 2. CAPTURAR EL INPUT DEL USUARIO (CON FÍSICAS DE REBOTE GRADUAL)
     float movX = 0.0f;
     float movY = 0.0f;
 
-    if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-      movX += 1.0f;
-    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
-      movX -= 1.0f;
-    if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W))
-      movY += 1.0f;
-    if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S))
-      movY -= 1.0f;
+    // Si el personaje está sufriendo un rebote, reducimos el tiempo y aplicamos
+    // la fuerza
+    if (tiempoBloqueoRebote > 0.0f) {
+      tiempoBloqueoRebote -= dt;
 
-    if (movX != 0.0f || movY != 0.0f) {
-      if (movX != 0.0f && movY != 0.0f) {
-        movX *= 0.55f;
+      // Desplazamos al jugador de forma gradual con las fuerzas acumuladas
+      jugadorX += reboteFuerzaX * dt;
+      jugadorY += reboteFuerzaY * dt;
+
+      // Fricción: frenamos la fuerza progresivamente para que el rebote sea
+      // suave
+      reboteFuerzaX *= 0.85f;
+      reboteFuerzaY *= 0.85f;
+    } else {
+      // Si no hay rebote activo, el jugador tiene el control normal
+      if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
+        movX += 1.0f;
+      if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
+        movX -= 1.0f;
+      if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W))
+        movY += 1.0f;
+      if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S))
+        movY -= 1.0f;
+
+      if (movX != 0.0f || movY != 0.0f) {
+        if (movX != 0.0f && movY != 0.0f)
+          movX *= 0.55f;
+        float longitud = sqrtf(movX * movX + movY * movY);
+        movX /= longitud;
+        movY /= longitud;
+
+        float pasoX = movX * (velocidad * 0.65f) * dt;
+        float pasoY = movY * velocidad * dt;
+
+        jugadorX += pasoX;
+        jugadorY += pasoY;
       }
-
-      float longitud = sqrtf(movX * movX + movY * movY);
-      movX /= longitud;
-      movY /= longitud;
-
-      float pasoX = movX * (velocidad * 0.65f) * dt;
-      float pasoY = movY * velocidad * dt;
-
-      jugadorX += pasoX;
-      jugadorY += pasoY;
     }
 
     // SIMULACIÓN DE IMPACTO (Abre puertas cerradas en cualquiera de los muros)
@@ -182,20 +202,32 @@ int main(void) {
       }
     }
 
-    // 3. SISTEMA DE COLISIONES DINÁMICAS CONTRA MUROS CIEGOS Y PUERTAS
+    // =========================================================================
+    // 3. SISTEMA DE COLISIONES DINÁMICAS, REBOTE OBLIGATORIO Y CIERRE DE HOJA
+    // =========================================================================
     bool cambiadoDeSala = false;
     Puerta puertaCruzada;
 
-    // --- COLISIÓN EN MURO IZQUIERDO (X < 0) ---
-    if (jugadorX < 0) {
+    // --- COLISIÓN EN MURO IZQUIERDO (Margen preventivo de X < 8.0f) ---
+    if (jugadorX < 8.0f) {
       bool enHuecoPuerta = false;
       for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
         Puerta *p = &mapa[salaActual].puertas[i];
         if (p->muro == MURO_IZQUIERDO) {
           float margenCentralY = p->ancho / 4.0f;
+
+          // Entrada por el centro del dintel (Apertura o Traspaso)
           if (jugadorY >= (p->posicion - margenCentralY) &&
               jugadorY <= (p->posicion + margenCentralY)) {
+            // Al impactar, inyectamos una velocidad hacia la derecha (+X)
             if (p->estado == PUERTA_CERRADA) {
+              p->estado = PUERTA_ABIERTA;
+              reboteFuerzaX =
+                  95.0f; // Reducido a la mitad para evitar el latigazo brusco
+              reboteFuerzaY = 0.0f;
+              tiempoBloqueoRebote =
+                  0.35f; // Extendemos ligeramente la amortiguación
+              jugadorX = 0.0f;
               enHuecoPuerta = false;
             } else {
               enHuecoPuerta = true;
@@ -205,27 +237,31 @@ int main(void) {
               }
             }
             break;
-          } else if (jugadorY >= (p->posicion - p->ancho / 2.0f) &&
-                     jugadorY <= (p->posicion + p->ancho / 2.0f)) {
-            if (p->estado == PUERTA_ABIERTA)
-              p->estado = PUERTA_CERRADA;
           }
         }
       }
-      if (!enHuecoPuerta)
+      if (!enHuecoPuerta && jugadorX < 0.0f)
         jugadorX = 0.0f;
     }
 
-    // --- COLISIÓN EN MURO DERECHO (X > s.ancho) ---
-    if (jugadorX > s.ancho && !cambiadoDeSala) {
+    // --- COLISIÓN EN MURO DERECHO (Margen preventivo de X > s.ancho - 8.0f)
+    // ---
+    if (jugadorX > (s.ancho - 8.0f) && !cambiadoDeSala) {
       bool enHuecoPuerta = false;
       for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
         Puerta *p = &mapa[salaActual].puertas[i];
         if (p->muro == MURO_DERECHO) {
           float margenCentralY = p->ancho / 4.0f;
+
           if (jugadorY >= (p->posicion - margenCentralY) &&
               jugadorY <= (p->posicion + margenCentralY)) {
+            // Al impactar, inyectamos velocidad hacia la izquierda (-X)
             if (p->estado == PUERTA_CERRADA) {
+              p->estado = PUERTA_ABIERTA;
+              reboteFuerzaX = -95.0f; // Reducido
+              reboteFuerzaY = 0.0f;
+              tiempoBloqueoRebote = 0.35f;
+              jugadorX = s.ancho;
               enHuecoPuerta = false;
             } else {
               enHuecoPuerta = true;
@@ -235,14 +271,10 @@ int main(void) {
               }
             }
             break;
-          } else if (jugadorY >= (p->posicion - p->ancho / 2.0f) &&
-                     jugadorY <= (p->posicion + p->ancho / 2.0f)) {
-            if (p->estado == PUERTA_ABIERTA)
-              p->estado = PUERTA_CERRADA;
           }
         }
       }
-      if (!enHuecoPuerta)
+      if (!enHuecoPuerta && jugadorX > s.ancho)
         jugadorX = s.ancho;
     }
 
@@ -253,9 +285,17 @@ int main(void) {
         Puerta *p = &mapa[salaActual].puertas[i];
         if (p->muro == MURO_FONDO) {
           float margenCentralX = p->ancho / 4.0f;
+
           if (jugadorX >= (p->posicion - margenCentralX) &&
               jugadorX <= (p->posicion + margenCentralX)) {
+            // Al impactar, inyectamos velocidad hacia abajo (-Y)
             if (p->estado == PUERTA_CERRADA) {
+              p->estado = PUERTA_ABIERTA;
+              reboteFuerzaX = 0.0f;
+              reboteFuerzaY = -95.0f; // Reducido para un retroceso vertical
+                                      // flotante y suave
+              tiempoBloqueoRebote = 0.35f;
+              jugadorY = s.largo;
               enHuecoPuerta = false;
             } else {
               enHuecoPuerta = true;
@@ -265,19 +305,78 @@ int main(void) {
               }
             }
             break;
-          } else if (jugadorX >= (p->posicion - p->ancho / 2.0f) &&
-                     jugadorX <= (p->posicion + p->ancho / 2.0f)) {
-            if (p->estado == PUERTA_ABIERTA)
-              p->estado = PUERTA_CERRADA;
           }
         }
       }
       if (!enHuecoPuerta)
         jugadorY = s.largo;
     }
+
+    // --- NUEVA MECÁNICA DE CIERRE POR EMPUJE (MUROS LATERALES Y FONDO) ---
+    // 1. Cierre de puertas laterales (Caminar hacia abajo chocando la hoja)
+    if (movY < 0.0f) {
+      for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
+        Puerta *p = &mapa[salaActual].puertas[i];
+        if (p->estado == PUERTA_ABIERTA) {
+          float longitudHojaLogica = p->alto * 0.75f;
+
+          if (p->muro == MURO_IZQUIERDO) {
+            if (jugadorX >= 0.0f && jugadorX <= longitudHojaLogica) {
+              if (antiguoY >= p->posicion && jugadorY < p->posicion) {
+                p->estado = PUERTA_CERRADA;
+                jugadorY = p->posicion + 8.0f;
+              }
+            }
+          } else if (p->muro == MURO_DERECHO) {
+            if (jugadorX >= (s.ancho - longitudHojaLogica) &&
+                jugadorX <= s.ancho) {
+              if (antiguoY >= p->posicion && jugadorY < p->posicion) {
+                p->estado = PUERTA_CERRADA;
+                jugadorY = p->posicion + 8.0f;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Cierre de puerta del fondo (Caminar hacia la derecha chocando la zona
+    // central de la hoja)
+    // 2. Cierre de puerta del fondo (Caminar hacia la derecha chocando el
+    // centro de la hoja)
+    if (movX > 0.0f) {
+      for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
+        Puerta *p = &mapa[salaActual].puertas[i];
+
+        if (p->muro == MURO_FONDO && p->estado == PUERTA_ABIERTA) {
+          if (jugadorY >= (s.largo - 10.0f) && jugadorY <= (s.largo + 15.0f)) {
+
+            float marcoIzquierdo = p->posicion - (p->ancho / 2.0f);
+
+            // --- CALIBRACIÓN ESTRICTA DEL CENTRO DE LA HOJA ---
+            // Reducimos la zona de impacto para centrarla de forma milimétrica.
+            // Forzamos a que el personaje ignore el extremo izquierdo (el 0.75f
+            // exterior) y solo active el cierre cuando el borde de la sombra
+            // (jugadorX + 8.0f) muerda el segmento central de la madera roja.
+            float zonaImpactoIzquierda =
+                marcoIzquierdo - (p->ancho * 0.45f); // Empujado a la derecha
+            float zonaImpactoDerecha = marcoIzquierdo - (p->ancho * 0.20f);
+
+            if ((jugadorX + 8.0f) >= zonaImpactoIzquierda &&
+                (jugadorX + 8.0f) <= zonaImpactoDerecha) {
+              p->estado = PUERTA_CERRADA;
+              jugadorX = antiguoX; // Frenado seco
+              break;
+            }
+          }
+        }
+      }
+    }
+
     // --- COLISIÓN EN EL FRENTE DE LA SALA (Y < 0) ---
     if (jugadorY < 0)
       jugadorY = antiguoY;
+
     // 4. COMPENSACIÓN ÓPTICA DEL ABANICO (SOLO SI EL MOVIMIENTO FUE VÁLIDO)
     if (movY != 0.0f && jugadorY != antiguoY) {
       float profundidadVisualFija = 220.0f;
@@ -429,7 +528,7 @@ int main(void) {
                    RED);
         }
         if (p.estado == PUERTA_ABIERTA) {
-          // 1. Forzamos el dintel negro nítido detrás de la hoja para el túnel
+          // Dibujamos el túnel de fondo
           DrawRectangle(basePuerta.x - p.ancho / 2.0f, basePuerta.y - p.alto,
                         p.ancho, p.alto, BLACK);
           DrawRectangleLinesEx((Rectangle){basePuerta.x - p.ancho / 2.0f,
@@ -437,29 +536,51 @@ int main(void) {
                                            p.alto},
                                2.0f, p.color);
 
-          // 2. Coordenadas de la bisagra (Marco izquierdo de la puerta)
+          // Bisagra izquierda fija
           Vector2 bisagraAbajo = {basePuerta.x - p.ancho / 2.0f, basePuerta.y};
           Vector2 bisagraArriba = {basePuerta.x - p.ancho / 2.0f,
                                    basePuerta.y - p.alto};
 
-          // 3. Extremo de la hoja proyectándose hacia la izquierda en paralelo
-          // al fondo (o ajustado al frente)
+          // Extremo de la hoja proyectándose un 75% hacia la izquierda en
+          // paralelo
           Vector2 extremoAbajo = {basePuerta.x - p.ancho / 2.0f -
                                       p.ancho * 0.75f,
                                   basePuerta.y + p.alto * 0.25f};
           Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
 
-          // --- UNIFICACIÓN DE RELLENO SÓLIDO RETRO ---
-          // Usamos el mismo gris oscuro que en los laterales para tapar las
-          // baldosas
-          Color colorRellenoPuerta = {255, 25, 25, 255};
+          // --- NUEVA DETECCIÓN VISUAL EN PANTALLA ---
+          // Calculamos el centro geométrico real de la hoja roja en píxeles de
+          // la pantalla
+          float centroHojaPantallaX = (bisagraAbajo.x + extremoAbajo.x) / 2.0f;
+          float centroHojaPantallaY = (bisagraAbajo.y + extremoAbajo.y) / 2.0f;
+
+          // Calculamos la posición real de la sombra del jugador en la pantalla
+          Vector2 posSueloPantalla = {jPosProyectada.x + scroll2DX,
+                                      jPosProyectada.y + scroll2DY};
+
+          // Si el jugador se mueve hacia la derecha (movX > 0) y su elipse
+          // colisiona con el centro de la hoja en la pantalla, cerramos el
+          // portón de inmediato
+          if (movX > 0.0f) {
+            float distanciaX = fabsf(posSueloPantalla.x - centroHojaPantallaX);
+            float distanciaY = fabsf(posSueloPantalla.y - centroHojaPantallaY);
+
+            // Comprobamos si la sombra (radio de 16px en X y 8px en Y) toca el
+            // centro de la madera
+            if (distanciaX < 20.0f && distanciaY < 12.0f) {
+              mapa[salaActual].puertas[i].estado = PUERTA_CERRADA;
+              jugadorX = antiguoX; // Detiene el movimiento lúdico para que no
+                                   // atraviese el muro
+            }
+          }
+
+          // Renderizamos la hoja con su color sólido corregido
+          Color colorRellenoPuerta = {25, 25, 25, 255};
           DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo,
                        colorRellenoPuerta);
           DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo,
                        colorRellenoPuerta);
 
-          // Silueteamos la hoja con el color brillante original de la puerta
-          // (p.color)
           DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
           DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
           DrawLineEx(extremoArriba, bisagraArriba, 2.5f, p.color);
