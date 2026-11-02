@@ -429,7 +429,7 @@ int main(void) {
                    RED);
         }
         if (p.estado == PUERTA_ABIERTA) {
-          // 1. Fondo negro del túnel para dar profundidad
+          // 1. Forzamos el dintel negro nítido detrás de la hoja para el túnel
           DrawRectangle(basePuerta.x - p.ancho / 2.0f, basePuerta.y - p.alto,
                         p.ancho, p.alto, BLACK);
           DrawRectangleLinesEx((Rectangle){basePuerta.x - p.ancho / 2.0f,
@@ -437,26 +437,28 @@ int main(void) {
                                            p.alto},
                                2.0f, p.color);
 
-          // 2. NUEVA CONFIGURACIÓN: Fijamos las bisagras en el marco IZQUIERDO
-          // del arco
+          // 2. Coordenadas de la bisagra (Marco izquierdo de la puerta)
           Vector2 bisagraAbajo = {basePuerta.x - p.ancho / 2.0f, basePuerta.y};
           Vector2 bisagraArriba = {basePuerta.x - p.ancho / 2.0f,
                                    basePuerta.y - p.alto};
 
-          // 3. PROYECTAMOS HACIA LA IZQUIERDA (Restamos en lugar de sumar)
-          // Multiplicamos por p.ancho * 0.75f hacia la izquierda para que
-          // invada el suelo abriéndose de par en par
+          // 3. Extremo de la hoja proyectándose hacia la izquierda en paralelo
+          // al fondo (o ajustado al frente)
           Vector2 extremoAbajo = {basePuerta.x - p.ancho / 2.0f -
                                       p.ancho * 0.75f,
                                   basePuerta.y + p.alto * 0.25f};
           Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
 
-          // Rellenamos el tablón de negro para que tape las líneas de la
-          // cuadrícula del suelo
-          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo, BLACK);
-          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo, BLACK);
+          // --- UNIFICACIÓN DE RELLENO SÓLIDO RETRO ---
+          // Usamos el mismo gris oscuro que en los laterales para tapar las
+          // baldosas
+          Color colorRellenoPuerta = {255, 25, 25, 255};
+          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo,
+                       colorRellenoPuerta);
+          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo,
+                       colorRellenoPuerta);
 
-          // Trazamos el contorno brillante con el color original de la puerta
+          // Silueteamos la hoja con el color brillante original de la puerta
           // (p.color)
           DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
           DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
@@ -486,30 +488,23 @@ int main(void) {
           DrawText("X", centroX - 4, centroY - 5, 12, RED);
         }
         if (p.estado == PUERTA_ABIERTA) {
-          // Las bisagras se quedan fijas en el dintel trasero
           Vector2 bisagraAbajo = baseFondo;
           Vector2 bisagraArriba = techoFondo;
 
-          // --- GEOMETRÍA ORIGINAL: HORIZONTAL PURA Y COMPACTA ---
-          // Reducimos la anchura de la hoja al 40% de la altura para que sea
-          // más pequeña
-          float anchoHojaPixeles = p.alto * 0.70f;
+          float anchoHojaPixeles = p.alto * 0.75f;
 
           Vector2 extremoAbajo;
-          // Al abrirse en paralelo al fondo, se desplaza en HORIZONTAL PERFECTA
-          // hacia la derecha
           extremoAbajo.x = baseFondo.x + anchoHojaPixeles;
-          extremoAbajo.y =
-              baseFondo.y; // Mantenemos exactamente la misma Y de la bisagra
+          extremoAbajo.y = baseFondo.y;
 
-          // El extremo superior se eleva verticalmente de forma recta
           Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
 
-          // Rellenamos el cuerpo en negro y trazamos sus líneas de color
-          // brillante
-          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo, BLACK);
-          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo, BLACK);
+          // --- INVERSIÓN DE ORDEN DE VÉRTICES (Sentido antihorario correcto
+          // para OpenGL) ---
+          DrawTriangle(bisagraAbajo, extremoAbajo, bisagraArriba, p.color);
+          DrawTriangle(bisagraArriba, extremoAbajo, extremoArriba, p.color);
 
+          // Contorno brillante idéntico a la puerta del fondo
           DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
           DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
           DrawLineEx(extremoArriba, bisagraArriba, 2.5f, p.color);
@@ -543,18 +538,17 @@ int main(void) {
           Vector2 bisagraAbajo = baseFondo;
           Vector2 bisagraArriba = techoFondo;
 
-          float anchoHojaPixeles = p.alto * 0.70f;
+          float anchoHojaPixeles = p.alto * 0.75f;
 
           Vector2 extremoAbajo;
-          // Espejo simétrico para el muro derecho: horizontal perfecta
-          // desplazada hacia la izquierda
           extremoAbajo.x = baseFondo.x - anchoHojaPixeles;
-          extremoAbajo.y = baseFondo.y; // Mantenemos la misma Y de la bisagra
+          extremoAbajo.y = baseFondo.y;
 
           Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
 
-          DrawTriangle(bisagraAbajo, extremoAbajo, bisagraArriba, BLACK);
-          DrawTriangle(bisagraArriba, extremoAbajo, extremoArriba, BLACK);
+          // --- INVERSIÓN DE ORDEN DE VÉRTICES PARA EL LADO DERECHO ---
+          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo, p.color);
+          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo, p.color);
 
           DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
           DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
