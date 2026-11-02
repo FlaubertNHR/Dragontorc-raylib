@@ -1,5 +1,5 @@
-#include "math.h"
 #include "raylib.h"
+#include <math.h>
 
 const int screenWidth = 800;
 const int screenHeight = 600;
@@ -9,12 +9,15 @@ const int TILE_SIZE = 40;
 float jugadorX = 180.0f;
 float jugadorY = 40.0f;
 float velocidad = 160.0f;
+
 // --- NUEVAS VARIABLES DE ANIMACIÓN Y FLOTABILIDAD ---
 float jugadorZ = 12.0f; // Altura fija de flotación respecto al suelo
 float tiempoLevitacion =
     0.0f; // Temporizador para la oscilación suave (bobbing)
+float desfaseFlotando = 0.0f;
 
 typedef enum { MURO_IZQUIERDO, MURO_FONDO, MURO_DERECHO } TipoMuro;
+typedef enum { PUERTA_ABIERTA, PUERTA_CERRADA, SALIDA_LIBRE } EstadoPuerta;
 
 // --- ESTRUCTURA DE PUERTA INTERCONECTADA DE UNO A UNO ---
 typedef struct {
@@ -27,6 +30,8 @@ typedef struct {
 
   int salaDestino;     // Índice de la sala a la que viaja
   int idPuertaDestino; // ID de la puerta por la que va a salir en la otra sala
+  EstadoPuerta estado; // Registra si está abierta, cerrada o si es solo un
+                       // hueco sin puerta
 } Puerta;
 
 typedef struct {
@@ -75,65 +80,55 @@ Vector2 ProyeccionGeometriaSala(float x, float y, float anchoSala) {
 }
 
 int main(void) {
-  // Cambia el título de la ventana para verificar que compila el código
-  // correcto
   InitWindow(screenWidth, screenHeight, "PRUEBA DE COMPILACION - NUEVO CODIGO");
-
   SetTargetFPS(60);
 
   // --- ENLAZANDO LAS PUERTAS DEL MAPA EN PAREJAS STRICTAS ---
-  Sala mapa[] = {{360.0f,
-                  220.0f,
-                  140.0f,
-                  RED,
-                  "CAVERNS OF DOOM",
-                  {
-                      {10, MURO_FONDO, 180.0f, 60.0f, 85.0f, RED, 2,
-                       30}, // Conecta con Sala 2 (Fondo)
-                      {11, MURO_DERECHO, 60.0f, 35.0f, 85.0f, MAROON, 1,
-                       20}, // Conecta con Sala 1 (Izq abajo)
-                      {12, MURO_DERECHO, 160.0f, 35.0f, 85.0f, MAROON, 1, 21}
-                      // Conecta con Sala 1 (Izq arriba)
-                  },
-                  3},
-                 {240.0f,
-                  220.0f,
-                  140.0f,
-                  GREEN,
-                  "GATEHOUSE LEVEL",
-                  {
-                      {20, MURO_IZQUIERDO, 60.0f, 35.0f, 80.0f, MAROON, 0,
-                       11}, // Regresa exacto a la 11 de la Sala 0
-                      {21, MURO_IZQUIERDO, 160.0f, 35.0f, 80.0f, MAROON, 0,
-                       12}, // Regresa exacto a la 12 de la Sala 0
-                      {22, MURO_DERECHO, 110.0f, 35.0f, 80.0f, RED, 2, 31}
-                      // Conecta con la Sala 2 (Fondo izq)
-                  },
-                  3},
-                 {560.0f,
-                  220.0f,
-                  140.0f,
-                  BLUE,
-                  "THE CROSSROADS",
-                  {
-                      {30, MURO_FONDO, 280.0f, 50.0f, 80.0f, RED, 0,
-                       10}, // Regresa exacto a la 10 de la Sala 0
-                      {31, MURO_FONDO, 80.0f, 50.0f, 80.0f, RED, 1, 22}
-                      // Regresa exacto a la 22 de la Sala 1
-                  },
-                  2}};
+  Sala mapa[] = {
+      {360.0f,
+       220.0f,
+       140.0f,
+       RED,
+       "CAVERNS OF DOOM",
+       {
+           {10, MURO_FONDO, 180.0f, 60.0f, 85.0f, RED, 2, 30,
+            PUERTA_CERRADA}, // Conecta con Sala 2 (Fondo)
+           {11, MURO_DERECHO, 60.0f, 35.0f, 85.0f, MAROON, 1, 20,
+            PUERTA_ABIERTA}, // Conecta con Sala 1
+           {12, MURO_DERECHO, 160.0f, 35.0f, 85.0f, MAROON, 1, 21,
+            SALIDA_LIBRE} // Salida Libre sin puerta
+       },
+       3},
+      {240.0f,
+       220.0f,
+       140.0f,
+       GREEN,
+       "GATEHOUSE LEVEL",
+       {{20, MURO_IZQUIERDO, 60.0f, 35.0f, 80.0f, MAROON, 0, 11,
+         PUERTA_ABIERTA},
+        {21, MURO_IZQUIERDO, 160.0f, 35.0f, 80.0f, MAROON, 0, 12,
+         PUERTA_ABIERTA},
+        {22, MURO_DERECHO, 110.0f, 35.0f, 80.0f, RED, 2, 31, PUERTA_ABIERTA}},
+       3},
+      {560.0f,
+       220.0f,
+       140.0f,
+       BLUE,
+       "THE CROSSROADS",
+       {{30, MURO_FONDO, 280.0f, 50.0f, 80.0f, RED, 0, 10, PUERTA_ABIERTA},
+        {31, MURO_FONDO, 80.0f, 50.0f, 80.0f, RED, 1, 22, PUERTA_ABIERTA}},
+       2}};
   int salaActual = 0;
 
   while (!WindowShouldClose()) {
     float dt = GetFrameTime();
     Sala s = mapa[salaActual];
 
-    // 1. GUARDAR LA POSICIÓN ANTES DEL MOVIMIENTO (Esto se queda igual)
+    // 1. GUARDAR LA POSICIÓN ANTES DEL MOVIMIENTO
     float antiguoX = jugadorX;
     float antiguoY = jugadorY;
 
-    // 2. CAPTURAR EL INPUT DEL USUARIO (MOVIMIENTO BASE PLANO SIN ALTERAR X EN
-    // ESTE PASO)
+    // 2. CAPTURAR EL INPUT DEL USUARIO (X REDUCIDA Y DIAGONALES CALIBRADAS)
     float movX = 0.0f;
     float movY = 0.0f;
 
@@ -142,22 +137,19 @@ int main(void) {
     if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
       movX -= 1.0f;
     if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W))
-      movY += 1.0f; // Sube hacia el fondo
+      movY += 1.0f;
     if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S))
-      movY -= 1.0f; // Baja hacia el frente
+      movY -= 1.0f;
 
     if (movX != 0.0f || movY != 0.0f) {
-      // Calibración de diagonales para la X lenta (65%) que pusimos antes
       if (movX != 0.0f && movY != 0.0f) {
         movX *= 0.55f;
       }
 
-      // Normalización del vector de entrada
       float longitud = sqrtf(movX * movX + movY * movY);
       movX /= longitud;
       movY /= longitud;
 
-      // AVANCE LOGÍSTICO INICIAL (Calculamos el paso de forma independiente)
       float pasoX = movX * (velocidad * 0.65f) * dt;
       float pasoY = movY * velocidad * dt;
 
@@ -165,132 +157,152 @@ int main(void) {
       jugadorY += pasoY;
     }
 
-    // 3. SISTEMA DE COLISIONES DINÁMICAS CONTRA MUROS CIEGOS
+    // SIMULACIÓN DE IMPACTO (Abre puertas cerradas en cualquiera de los muros)
+    if (IsKeyPressed(KEY_SPACE)) {
+      for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
+        Puerta *p = &mapa[salaActual].puertas[i];
+        if (p->estado == PUERTA_CERRADA) {
+          if (p->muro == MURO_FONDO && jugadorY > (s.largo - 30.0f)) {
+            if (jugadorX >= (p->posicion - p->ancho / 2.0f) &&
+                jugadorX <= (p->posicion + p->ancho / 2.0f)) {
+              p->estado = PUERTA_ABIERTA;
+            }
+          } else if (p->muro == MURO_IZQUIERDO && jugadorX < 30.0f) {
+            if (jugadorY >= (p->posicion - p->ancho / 2.0f) &&
+                jugadorY <= (p->posicion + p->ancho / 2.0f)) {
+              p->estado = PUERTA_ABIERTA;
+            }
+          } else if (p->muro == MURO_DERECHO && jugadorX > (s.ancho - 30.0f)) {
+            if (jugadorY >= (p->posicion - p->ancho / 2.0f) &&
+                jugadorY <= (p->posicion + p->ancho / 2.0f)) {
+              p->estado = PUERTA_ABIERTA;
+            }
+          }
+        }
+      }
+    }
+
+    // 3. SISTEMA DE COLISIONES DINÁMICAS CONTRA MUROS CIEGOS Y PUERTAS
     bool cambiadoDeSala = false;
     Puerta puertaCruzada;
 
     // --- COLISIÓN EN MURO IZQUIERDO (X < 0) ---
     if (jugadorX < 0) {
       bool enHuecoPuerta = false;
-      for (int i = 0; i < s.cantidadPuertas; i++) {
-        Puerta p = s.puertas[i];
-        if (p.muro == MURO_IZQUIERDO &&
-            jugadorY >= (p.posicion - p.ancho / 2.0f) &&
-            jugadorY <= (p.posicion + p.ancho / 2.0f)) {
-          puertaCruzada = p;
-          cambiadoDeSala = true;
-          enHuecoPuerta = true;
-          break;
+      for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
+        Puerta *p = &mapa[salaActual].puertas[i];
+        if (p->muro == MURO_IZQUIERDO) {
+          float margenCentralY = p->ancho / 4.0f;
+          if (jugadorY >= (p->posicion - margenCentralY) &&
+              jugadorY <= (p->posicion + margenCentralY)) {
+            if (p->estado == PUERTA_CERRADA) {
+              enHuecoPuerta = false;
+            } else {
+              enHuecoPuerta = true;
+              if (jugadorX < -3.0f) {
+                puertaCruzada = *p;
+                cambiadoDeSala = true;
+              }
+            }
+            break;
+          } else if (jugadorY >= (p->posicion - p->ancho / 2.0f) &&
+                     jugadorY <= (p->posicion + p->ancho / 2.0f)) {
+            if (p->estado == PUERTA_ABIERTA)
+              p->estado = PUERTA_CERRADA;
+          }
         }
       }
       if (!enHuecoPuerta)
-        jugadorX = antiguoX;
+        jugadorX = 0.0f;
     }
 
     // --- COLISIÓN EN MURO DERECHO (X > s.ancho) ---
     if (jugadorX > s.ancho && !cambiadoDeSala) {
       bool enHuecoPuerta = false;
-      for (int i = 0; i < s.cantidadPuertas; i++) {
-        Puerta p = s.puertas[i];
-        if (p.muro == MURO_DERECHO &&
-            jugadorY >= (p.posicion - p.ancho / 2.0f) &&
-            jugadorY <= (p.posicion + p.ancho / 2.0f)) {
-          puertaCruzada = p;
-          cambiadoDeSala = true;
-          enHuecoPuerta = true;
-          break;
-        }
-      }
-      if (!enHuecoPuerta)
-        jugadorX = antiguoX;
-    }
-
-    // --- COLISIÓN EN MURO DEL FONDO (ZONA CENTRAL ESTRICTA) ---
-    if (jugadorY > s.largo && !cambiadoDeSala) {
-      bool enHuecoPuerta = false;
-
-      for (int i = 0; i < s.cantidadPuertas; i++) {
-        Puerta p = s.puertas[i];
-        if (p.muro == MURO_FONDO) {
-          // Reducimos el ancho de colisión efectivo a la mitad (ancho / 4.0f a
-          // cada lado) Así obligamos a pasar obligatoriamente por el CENTRO
-          // real de la puerta
-          float margenCentralX = p.ancho / 4.0f;
-
-          if (jugadorX >= (p.posicion - margenCentralX) &&
-              jugadorX <= (p.posicion + margenCentralX)) {
-            enHuecoPuerta = true;
-
-            // Activamos la transición SOLO si la sombra se adentra físicamente
-            // en la profundidad del dintel (+8 píxeles del radio de la elipse)
-            if (jugadorY > (s.largo + 8.0f)) {
-              puertaCruzada = p;
-              cambiadoDeSala = true;
+      for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
+        Puerta *p = &mapa[salaActual].puertas[i];
+        if (p->muro == MURO_DERECHO) {
+          float margenCentralY = p->ancho / 4.0f;
+          if (jugadorY >= (p->posicion - margenCentralY) &&
+              jugadorY <= (p->posicion + margenCentralY)) {
+            if (p->estado == PUERTA_CERRADA) {
+              enHuecoPuerta = false;
+            } else {
+              enHuecoPuerta = true;
+              if (jugadorX > (s.ancho + 3.0f)) {
+                puertaCruzada = *p;
+                cambiadoDeSala = true;
+              }
             }
             break;
+          } else if (jugadorY >= (p->posicion - p->ancho / 2.0f) &&
+                     jugadorY <= (p->posicion + p->ancho / 2.0f)) {
+            if (p->estado == PUERTA_ABIERTA)
+              p->estado = PUERTA_CERRADA;
           }
         }
       }
+      if (!enHuecoPuerta)
+        jugadorX = s.ancho;
+    }
 
-      // Si no está en el centro de la puerta o choca con muro ciego, se detiene
-      // en seco en el dintel
-      if (!enHuecoPuerta) {
-        jugadorY = s.largo;
+    // --- COLISIÓN EN MURO DEL FONDO (Y > s.largo) ---
+    if (jugadorY > s.largo && !cambiadoDeSala) {
+      bool enHuecoPuerta = false;
+      for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
+        Puerta *p = &mapa[salaActual].puertas[i];
+        if (p->muro == MURO_FONDO) {
+          float margenCentralX = p->ancho / 4.0f;
+          if (jugadorX >= (p->posicion - margenCentralX) &&
+              jugadorX <= (p->posicion + margenCentralX)) {
+            if (p->estado == PUERTA_CERRADA) {
+              enHuecoPuerta = false;
+            } else {
+              enHuecoPuerta = true;
+              if (jugadorY > (s.largo + 8.0f)) {
+                puertaCruzada = *p;
+                cambiadoDeSala = true;
+              }
+            }
+            break;
+          } else if (jugadorX >= (p->posicion - p->ancho / 2.0f) &&
+                     jugadorX <= (p->posicion + p->ancho / 2.0f)) {
+            if (p->estado == PUERTA_ABIERTA)
+              p->estado = PUERTA_CERRADA;
+          }
+        }
       }
+      if (!enHuecoPuerta)
+        jugadorY = s.largo;
     }
     // --- COLISIÓN EN EL FRENTE DE LA SALA (Y < 0) ---
     if (jugadorY < 0)
       jugadorY = antiguoY;
-
-    // 4. NUEVA SECCIÓN: COMPENSACIÓN ÓPTICA DEL ABANICO (SOLO SI EL MOVIMIENTO
-    // FUE VÁLIDO) Si el jugador ha chocado y ha sido devuelto a antiguoY,
-    // jugadorY será igual a antiguoY, por lo que no se aplicará ningún
-    // desplazamiento lateral indeseado.
+    // 4. COMPENSACIÓN ÓPTICA DEL ABANICO (SOLO SI EL MOVIMIENTO FUE VÁLIDO)
     if (movY != 0.0f && jugadorY != antiguoY) {
       float profundidadVisualFija = 220.0f;
-      float factorY = jugadorY / profundidadVisualFija;
-      if (factorY < 0.0f)
-        factorY = 0.0f;
-      if (factorY > 1.0f)
-        factorY = 1.0f;
-
-      float pasoY =
-          (jugadorY -
-           antiguoY); // Calculamos el avance vertical real neto que ha ocurrido
+      float pasoY = (jugadorY - antiguoY);
       float centroSala = s.ancho / 2.0f;
       float desviacion = jugadorX - centroSala;
-
-      // Aplicamos la corrección de fuga en X solo basándonos en el movimiento
-      // vertical real permitido
       jugadorX += (desviacion * (0.45f / profundidadVisualFija)) * pasoY;
     }
-
     // --- PROCESAMIENTO DE LA APARICIÓN EN LA PAREJA DE LA PUERTA ---
     if (cambiadoDeSala) {
       int proximaSalaIdx = puertaCruzada.salaDestino;
       int buscarID = puertaCruzada.idPuertaDestino;
       Sala proximaSala = mapa[proximaSalaIdx];
-
       for (int i = 0; i < proximaSala.cantidadPuertas; i++) {
         Puerta destino = proximaSala.puertas[i];
         if (destino.id == buscarID) {
-          // Colocamos al jugador justo enfrente del umbral en el mapa de
-          // destino dando un paso hacia el interior (18 píxeles) para evitar
-          // bucles
-          // Colocamos al jugador pegado al umbral en el mapa de destino
-          // Reducimos a 2.0f o 3.0f para que no flote lejos del muro visual
           if (destino.muro == MURO_IZQUIERDO) {
-            jugadorX = 3.0f; // Ajuste drástico para aparecer pegado a la pared
-                             // izquierda
+            jugadorX = 3.0f;
             jugadorY = destino.posicion;
           } else if (destino.muro == MURO_DERECHO) {
-            jugadorX = proximaSala.ancho - 3.0f; // Ajuste para aparecer pegado
-                                                 // a la pared derecha
+            jugadorX = proximaSala.ancho - 3.0f;
             jugadorY = destino.posicion;
           } else if (destino.muro == MURO_FONDO) {
             jugadorX = destino.posicion;
-            jugadorY = proximaSala.largo - 12.0f; // El fondo de la pantalla sí
-                                                  // requiere algo más de margen
+            jugadorY = proximaSala.largo - 12.0f;
           }
           break;
         }
@@ -298,7 +310,6 @@ int main(void) {
       salaActual = proximaSalaIdx;
       s = mapa[salaActual];
     }
-
     // SCROLL CENTRADO
     Vector2 jPosProyectada =
         ProyeccionGeometriaSala(jugadorX, jugadorY, s.ancho);
@@ -363,126 +374,209 @@ int main(void) {
     DrawLineV(pDerAbajo, (Vector2){pDerAbajo.x, pDerAbajo.y - s.alturaPared},
               s.colorMuro);
 
-    // RENDER DE LAS PUERTAS
-    for (int i = 0; i < s.cantidadPuertas; i++) {
-      Puerta p = s.puertas[i];
+    // (Tu código original de renderizado de la habitación se queda tal cual)
+    // --- RENDER DE LAS PUERTAS LEYENDO DEL MAPA REAL ---
+    for (int i = 0; i < mapa[salaActual].cantidadPuertas; i++) {
+      Puerta p = mapa[salaActual].puertas[i];
+      if (p.estado == SALIDA_LIBRE) {
+        if (p.muro == MURO_FONDO) {
+          Vector2 basePuerta =
+              ProyeccionGeometriaSala(p.posicion, s.largo, s.ancho);
+          basePuerta.x += scroll2DX;
+          basePuerta.y += scroll2DY;
+          DrawRectangle(basePuerta.x - p.ancho / 2.0f, basePuerta.y - p.alto,
+                        p.ancho, p.alto, BLACK);
+          DrawRectangleLinesEx((Rectangle){basePuerta.x - p.ancho / 2.0f,
+                                           basePuerta.y - p.alto, p.ancho,
+                                           p.alto},
+                               2.0f, p.color);
+        } else if (p.muro == MURO_IZQUIERDO || p.muro == MURO_DERECHO) {
+          float yFrente = p.posicion - (p.ancho / 2.0f);
+          float yFondo = p.posicion + (p.ancho / 2.0f);
+          float xMuro = (p.muro == MURO_IZQUIERDO) ? 1.0f : s.ancho - 1.0f;
+          Vector2 baseFrente = ProyeccionGeometriaSala(xMuro, yFrente, s.ancho);
+          Vector2 baseFondo = ProyeccionGeometriaSala(xMuro, yFondo, s.ancho);
+          baseFrente.x += scroll2DX;
+          baseFrente.y += scroll2DY;
+          baseFondo.x += scroll2DX;
+          baseFondo.y += scroll2DY;
+          Vector2 techoFrente = {baseFrente.x, baseFrente.y - p.alto};
+          DrawTriangle(baseFrente, baseFondo, techoFrente, BLACK);
+          DrawTriangle(techoFrente, baseFondo,
+                       (Vector2){baseFondo.x, baseFondo.y - p.alto}, BLACK);
+          DrawLineEx(baseFrente, techoFrente, 2.0f, p.color);
+          DrawLineEx(techoFrente, (Vector2){baseFondo.x, baseFondo.y - p.alto},
+                     2.0f, p.color);
+          DrawLineEx((Vector2){baseFondo.x, baseFondo.y - p.alto}, baseFondo,
+                     2.0f, p.color);
+        }
+        continue;
+      }
+      Color colorInterior = (p.estado == PUERTA_CERRADA) ? DARKGRAY : BLACK;
       if (p.muro == MURO_FONDO) {
         Vector2 basePuerta =
             ProyeccionGeometriaSala(p.posicion, s.largo, s.ancho);
         basePuerta.x += scroll2DX;
         basePuerta.y += scroll2DY;
         DrawRectangle(basePuerta.x - p.ancho / 2.0f, basePuerta.y - p.alto,
-                      p.ancho, p.alto, p.color);
-        DrawRectangleLines(basePuerta.x - p.ancho / 2.0f, basePuerta.y - p.alto,
-                           p.ancho, p.alto, BLACK);
+                      p.ancho, p.alto, colorInterior);
+        DrawRectangleLinesEx((Rectangle){basePuerta.x - p.ancho / 2.0f,
+                                         basePuerta.y - p.alto, p.ancho,
+                                         p.alto},
+                             2.0f, p.color);
+        if (p.estado == PUERTA_CERRADA) {
+          DrawText("X", basePuerta.x - 5, basePuerta.y - p.alto / 2.0f - 5, 12,
+                   RED);
+        }
+        if (p.estado == PUERTA_ABIERTA) {
+          // 1. Fondo negro del túnel para dar profundidad
+          DrawRectangle(basePuerta.x - p.ancho / 2.0f, basePuerta.y - p.alto,
+                        p.ancho, p.alto, BLACK);
+          DrawRectangleLinesEx((Rectangle){basePuerta.x - p.ancho / 2.0f,
+                                           basePuerta.y - p.alto, p.ancho,
+                                           p.alto},
+                               2.0f, p.color);
+
+          // 2. NUEVA CONFIGURACIÓN: Fijamos las bisagras en el marco IZQUIERDO
+          // del arco
+          Vector2 bisagraAbajo = {basePuerta.x - p.ancho / 2.0f, basePuerta.y};
+          Vector2 bisagraArriba = {basePuerta.x - p.ancho / 2.0f,
+                                   basePuerta.y - p.alto};
+
+          // 3. PROYECTAMOS HACIA LA IZQUIERDA (Restamos en lugar de sumar)
+          // Multiplicamos por p.ancho * 0.75f hacia la izquierda para que
+          // invada el suelo abriéndose de par en par
+          Vector2 extremoAbajo = {basePuerta.x - p.ancho / 2.0f -
+                                      p.ancho * 0.75f,
+                                  basePuerta.y + p.alto * 0.25f};
+          Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
+
+          // Rellenamos el tablón de negro para que tape las líneas de la
+          // cuadrícula del suelo
+          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo, BLACK);
+          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo, BLACK);
+
+          // Trazamos el contorno brillante con el color original de la puerta
+          // (p.color)
+          DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
+          DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
+          DrawLineEx(extremoArriba, bisagraArriba, 2.5f, p.color);
+        }
+
       } else if (p.muro == MURO_IZQUIERDO) {
         float yFrente = p.posicion - (p.ancho / 2.0f);
         float yFondo = p.posicion + (p.ancho / 2.0f);
-        Vector2 baseFrente = ProyeccionGeometriaSala(0.0f, yFrente, s.ancho);
-        Vector2 baseFondo = ProyeccionGeometriaSala(0.0f, yFondo, s.ancho);
+        Vector2 baseFrente = ProyeccionGeometriaSala(1.0f, yFrente, s.ancho);
+        Vector2 baseFondo = ProyeccionGeometriaSala(1.0f, yFondo, s.ancho);
         baseFrente.x += scroll2DX;
         baseFrente.y += scroll2DY;
         baseFondo.x += scroll2DX;
         baseFondo.y += scroll2DY;
         Vector2 techoFrente = {baseFrente.x, baseFrente.y - p.alto};
         Vector2 techoFondo = {baseFondo.x, baseFondo.y - p.alto};
-        DrawTriangle(baseFrente, baseFondo, techoFrente, p.color);
-        DrawTriangle(techoFrente, baseFondo, techoFondo, p.color);
-        DrawLineV(baseFrente, techoFrente, BLACK);
-        DrawLineV(techoFrente, techoFondo, BLACK);
-        DrawLineV(techoFondo, baseFondo, BLACK);
-        DrawLineV(baseFondo, baseFrente, BLACK);
+        DrawTriangle(baseFrente, baseFondo, techoFrente, colorInterior);
+        DrawTriangle(techoFrente, baseFondo, techoFondo, colorInterior);
+        DrawLineEx(baseFrente, techoFrente, 2.0f, p.color);
+        DrawLineEx(techoFrente, techoFondo, 2.0f, p.color);
+        DrawLineEx(techoFondo, baseFondo, 2.0f, p.color);
+        DrawLineEx(baseFondo, baseFrente, 2.0f, p.color);
+        if (p.estado == PUERTA_CERRADA) {
+          float centroX = (baseFrente.x + baseFondo.x) / 2.0f;
+          float centroY = (baseFrente.y + baseFondo.y) / 2.0f - p.alto / 2.0f;
+          DrawText("X", centroX - 4, centroY - 5, 12, RED);
+        }
+        if (p.estado == PUERTA_ABIERTA) {
+          // Las bisagras se quedan fijas en el dintel trasero
+          Vector2 bisagraAbajo = baseFondo;
+          Vector2 bisagraArriba = techoFondo;
+
+          // --- GEOMETRÍA ORIGINAL: HORIZONTAL PURA Y COMPACTA ---
+          // Reducimos la anchura de la hoja al 40% de la altura para que sea
+          // más pequeña
+          float anchoHojaPixeles = p.alto * 0.70f;
+
+          Vector2 extremoAbajo;
+          // Al abrirse en paralelo al fondo, se desplaza en HORIZONTAL PERFECTA
+          // hacia la derecha
+          extremoAbajo.x = baseFondo.x + anchoHojaPixeles;
+          extremoAbajo.y =
+              baseFondo.y; // Mantenemos exactamente la misma Y de la bisagra
+
+          // El extremo superior se eleva verticalmente de forma recta
+          Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
+
+          // Rellenamos el cuerpo en negro y trazamos sus líneas de color
+          // brillante
+          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo, BLACK);
+          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo, BLACK);
+
+          DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
+          DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
+          DrawLineEx(extremoArriba, bisagraArriba, 2.5f, p.color);
+        }
+
       } else if (p.muro == MURO_DERECHO) {
         float yFrente = p.posicion - (p.ancho / 2.0f);
         float yFondo = p.posicion + (p.ancho / 2.0f);
-        Vector2 baseFrente = ProyeccionGeometriaSala(s.ancho, yFrente, s.ancho);
-        Vector2 baseFondo = ProyeccionGeometriaSala(s.ancho, yFondo, s.ancho);
+        Vector2 baseFrente =
+            ProyeccionGeometriaSala(s.ancho - 1.0f, yFrente, s.ancho);
+        Vector2 baseFondo =
+            ProyeccionGeometriaSala(s.ancho - 1.0f, yFondo, s.ancho);
         baseFrente.x += scroll2DX;
         baseFrente.y += scroll2DY;
         baseFondo.x += scroll2DX;
         baseFondo.y += scroll2DY;
         Vector2 techoFrente = {baseFrente.x, baseFrente.y - p.alto};
         Vector2 techoFondo = {baseFondo.x, baseFondo.y - p.alto};
-        DrawTriangle(baseFrente, techoFrente, baseFondo, p.color);
-        DrawTriangle(techoFrente, techoFondo, baseFondo, p.color);
-        DrawLineV(baseFrente, techoFrente, BLACK);
-        DrawLineV(techoFrente, techoFondo, BLACK);
-        DrawLineV(techoFondo, baseFondo, BLACK);
-        DrawLineV(baseFondo, baseFrente, BLACK);
+        DrawTriangle(baseFrente, techoFrente, baseFondo, colorInterior);
+        DrawTriangle(techoFrente, techoFondo, baseFondo, colorInterior);
+        DrawLineEx(baseFrente, techoFrente, 2.0f, p.color);
+        DrawLineEx(techoFrente, techoFondo, 2.0f, p.color);
+        DrawLineEx(techoFondo, baseFondo, 2.0f, p.color);
+        DrawLineEx(baseFondo, baseFrente, 2.0f, p.color);
+        if (p.estado == PUERTA_CERRADA) {
+          float centroX = (baseFrente.x + baseFondo.x) / 2.0f;
+          float centroY = (baseFrente.y + baseFondo.y) / 2.0f - p.alto / 2.0f;
+          DrawText("X", centroX - 4, centroY - 5, 12, RED);
+        }
+        if (p.estado == PUERTA_ABIERTA) {
+          Vector2 bisagraAbajo = baseFondo;
+          Vector2 bisagraArriba = techoFondo;
+
+          float anchoHojaPixeles = p.alto * 0.70f;
+
+          Vector2 extremoAbajo;
+          // Espejo simétrico para el muro derecho: horizontal perfecta
+          // desplazada hacia la izquierda
+          extremoAbajo.x = baseFondo.x - anchoHojaPixeles;
+          extremoAbajo.y = baseFondo.y; // Mantenemos la misma Y de la bisagra
+
+          Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
+
+          DrawTriangle(bisagraAbajo, extremoAbajo, bisagraArriba, BLACK);
+          DrawTriangle(bisagraArriba, extremoAbajo, extremoArriba, BLACK);
+
+          DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
+          DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
+          DrawLineEx(extremoArriba, bisagraArriba, 2.5f, p.color);
+        }
       }
     }
-    // --- DIBUJADO DEL PERSONAJE ESTILO DRAGONTORC ---
-    // 1. Conseguimos la posición proyectada exacta de los "pies" (el suelo)
-    Vector2 jSueloProyectado =
-        ProyeccionGeometriaSala(jugadorX, jugadorY, s.ancho);
-
-    // Aplicamos el scroll de cámara a las coordenadas proyectadas
-    Vector2 posSueloPantalla = {jSueloProyectado.x + scroll2DX,
-                                jSueloProyectado.y + scroll2DY};
-
-    // Dibujamos la SOMBRA (Círculo/Óvalo de colisión e interacción)
-    // Se dibuja en negro/gris translúcido justo encima de las baldosas
-    DrawEllipse(posSueloPantalla.x, posSueloPantalla.y, 16.0f, 8.0f,
-                GetColor(0x00000044));
-
-    // 2. Calculamos la levitación flotante (Oscilación matemática usando Seno)
-    tiempoLevitacion += dt * 4.0f; // Controla la velocidad del balanceo
-    float desfaseFlotando =
-        sinf(tiempoLevitacion) * 4.0f; // Amplitud del balanceo (4 píxeles)
-
-    // La posición del cuerpo visual se desplaza hacia arriba sumando la base Z
-    // + el balanceo
-    float desplazamientoVisualY = jugadorZ + desfaseFlotando;
-
-    // --- DIBUJADO DEL PERSONAJE FLOTANTE Y SU SOMBRA EN EL SUELO ---
-
-    // 1. Calculamos la posición visual exacta de los "pies" del jugador en el
-    // mapa
-    jSueloProyectado = ProyeccionGeometriaSala(jugadorX, jugadorY, s.ancho);
-
-    // Aplicamos el scroll de la cámara para centrarlo en la pantalla
-    posSueloPantalla.x = jSueloProyectado.x + scroll2DX;
-    posSueloPantalla.y = jSueloProyectado.y + scroll2DY;
-
-    // -------------------------------------------------------------------------
-    // DIBUJAR LA SOMBRA (El círculo físico de interacción)
-    // Dibujamos un óvalo negro semi-transparente pegado a las baldosas.
-    // Al pasar por encima de las líneas del suelo, se verá perfectamente.
-    // -------------------------------------------------------------------------
-    // Cambiamos el color a Blanco Puro (255, 255, 255)
-    // Mantenemos la opacidad en 85 sobre 255 para que sea translúcida y deje
-    // ver las baldosas
+    // --- DIBUJADO DEL PERSONAJE FLOTANTE Y SU SOMBRA BLANCA ---
+    Vector2 posSueloPantalla = {jPosProyectada.x + scroll2DX,
+                                jPosProyectada.y + scroll2DY};
     DrawEllipse(posSueloPantalla.x, posSueloPantalla.y, 16.0f, 8.0f,
                 (Color){255, 255, 255, 85});
-
-    // 2. Calculamos la levitación del cuerpo (Efecto "bobbing" flotante con
-    // Seno)
-    tiempoLevitacion += dt * 4.0f; // Velocidad del vaivén
-    desfaseFlotando =
-        sinf(tiempoLevitacion) * 3.5f; // Amplitud (sube y baja 3.5 píxeles)
-
-    // El cuerpo visual flota a una altura fija (12.0f) más el balanceo
-    // matemático
+    tiempoLevitacion += dt * 4.0f;
+    desfaseFlotando = sinf(tiempoLevitacion) * 3.5f;
     float alturaVisualTotal = jugadorZ + desfaseFlotando;
-
-    // -------------------------------------------------------------------------
-    // DIBUJAR EL CUERPO FLOTANTE (El cubo blanco)
-    // Desplazamos el cubo hacia arriba usando 'alturaVisualTotal'
-    // -------------------------------------------------------------------------
-    float cuboAncho = 20.0f;
-    float cuboAlto = 35.0f;
-    DrawRectangle(posSueloPantalla.x - cuboAncho / 2.0f,
-                  posSueloPantalla.y - cuboAlto - alturaVisualTotal, cuboAncho,
-                  cuboAlto, WHITE);
-
-    // INTERFAZ
-    DrawRectangle(0, 450, screenWidth, 150, GOLD);
-    DrawRectangleLines(10, 460, screenWidth - 20, 130, BLACK);
-    DrawText("move", 60, 480, 25, BLACK);
-    DrawText(s.nombre, 60, 520, 28, BLACK);
-    DrawText("Cada puerta está ahora correctamente enlazada una a una.", 300,
-             480, 16, DARKGRAY);
-    DrawFPS(10, 10);
+    float cAncho = 20.0f;
+    float cAlto = 35.0f;
+    DrawRectangle(posSueloPantalla.x - cAncho / 2.0f,
+                  posSueloPantalla.y - cAlto - alturaVisualTotal, cAncho, cAlto,
+                  WHITE);
+    // [AQUÍ DIBUJAS LA INTERFAZ / HUD DE TEXTO AMARILLO]
+    // DrawText(s.nombre, ...);
     EndDrawing();
   }
   CloseWindow();
