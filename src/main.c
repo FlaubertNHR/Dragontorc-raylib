@@ -654,8 +654,11 @@ int main(void) {
 
           // --- INVERSIÓN DE ORDEN DE VÉRTICES (Sentido antihorario correcto
           // para OpenGL) ---
-          DrawTriangle(bisagraAbajo, extremoAbajo, bisagraArriba, p.color);
-          DrawTriangle(bisagraArriba, extremoAbajo, extremoArriba, p.color);
+          Color colorRellenoPuerta = {25, 25, 25, 255};
+          DrawTriangle(bisagraAbajo, extremoAbajo, bisagraArriba,
+                       colorRellenoPuerta);
+          DrawTriangle(bisagraArriba, extremoAbajo, extremoArriba,
+                       colorRellenoPuerta);
 
           // Contorno brillante idéntico a la puerta del fondo
           DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
@@ -700,8 +703,9 @@ int main(void) {
           Vector2 extremoArriba = {extremoAbajo.x, extremoAbajo.y - p.alto};
 
           // --- INVERSIÓN DE ORDEN DE VÉRTICES PARA EL LADO DERECHO ---
-          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo, p.color);
-          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo, p.color);
+          Color colorRellenoPuerta = {25, 25, 25, 255};  // NHR. Cambiar aqui el color de la puerta abierta
+          DrawTriangle(bisagraAbajo, bisagraArriba, extremoAbajo, colorRellenoPuerta);
+          DrawTriangle(bisagraArriba, extremoArriba, extremoAbajo, colorRellenoPuerta);
 
           DrawLineEx(bisagraAbajo, extremoAbajo, 2.5f, p.color);
           DrawLineEx(extremoAbajo, extremoArriba, 2.5f, p.color);
