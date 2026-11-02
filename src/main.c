@@ -169,11 +169,43 @@ int main(void) {
         movX /= longitud;
         movY /= longitud;
 
-        float pasoX = movX * (velocidad * 0.65f) * dt;
+        // --- CÁLCULO DE VELOCIDAD DE PANTALLA PURA E IDÉNTICA EN CUALQUIER
+        // SALA ---
+        // 1. Calculamos cuánto se estira un paso de '1.0' unidad en la pantalla
+        // en esta sala concreta
+        Vector2 pBase = ProyeccionGeometriaSala(0.0f, jugadorY, s.ancho);
+        Vector2 pTest = ProyeccionGeometriaSala(1.0f, jugadorY, s.ancho);
+        float pixelesPorUnidadLogica = fabsf(pTest.x - pBase.x);
+
+        // 2. Si el ratio visual es válido, calculamos el paso lógico exacto
+        // necesario para avanzar una cantidad fija de píxeles visuales en el
+        // monitor
+        float pasoX = 0.0f;
+        if (pixelesPorUnidadLogica > 0.0f) {
+          // Modificando el 1.35f puedes cambiar la velocidad horizontal global
+          // de forma uniforme
+          pasoX = (movX * (velocidad * 1.35f) * dt) / pixelesPorUnidadLogica;
+        }
         float pasoY = movY * velocidad * dt;
 
-        jugadorX += pasoX;
-        jugadorY += pasoY;
+        // 3. Aplicamos exactamente la misma corrección visual adaptativa al
+        // rebote gradual
+        if (tiempoBloqueoRebote > 0.0f) {
+          tiempoBloqueoRebote -= dt;
+
+          float reboteLogicoX = 0.0f;
+          if (pixelesPorUnidadLogica > 0.0f) {
+            reboteLogicoX = (reboteFuerzaX * dt) / pixelesPorUnidadLogica;
+          }
+
+          jugadorX += reboteLogicoX;
+          jugadorY += reboteFuerzaY * dt;
+          reboteFuerzaX *= 0.85f;
+          reboteFuerzaY *= 0.85f;
+        } else {
+          jugadorX += pasoX;
+          jugadorY += pasoY;
+        }
       }
     }
 
