@@ -9,6 +9,10 @@ const int TILE_SIZE = 40;
 float jugadorX = 180.0f;
 float jugadorY = 40.0f;
 float velocidad = 160.0f;
+// --- NUEVAS VARIABLES DE ANIMACIÓN Y FLOTABILIDAD ---
+float jugadorZ = 12.0f; // Altura fija de flotación respecto al suelo
+float tiempoLevitacion =
+    0.0f; // Temporizador para la oscilación suave (bobbing)
 
 typedef enum { MURO_IZQUIERDO, MURO_FONDO, MURO_DERECHO } TipoMuro;
 
@@ -124,13 +128,12 @@ int main(void) {
     float dt = GetFrameTime();
     Sala s = mapa[salaActual];
 
-    // 1. GUARDAR LA POSICIÓN ANTES DEL MOVIMIENTO
-    // Si el jugador choca, lo devolveremos a estas coordenadas para bloquearlo
+    // 1. GUARDAR LA POSICIÓN ANTES DEL MOVIMIENTO (Esto se queda igual)
     float antiguoX = jugadorX;
     float antiguoY = jugadorY;
 
-    // 2. CAPTURAR EL INPUT DEL USUARIO (DIAGONALES CERRADAS - CORRECCIÓN DE EJE
-    // X)
+    // 2. CAPTURAR EL INPUT DEL USUARIO (MOVIMIENTO BASE PLANO SIN ALTERAR X EN
+    // ESTE PASO)
     float movX = 0.0f;
     float movY = 0.0f;
 
@@ -144,41 +147,19 @@ int main(void) {
       movY -= 1.0f; // Baja hacia el frente
 
     if (movX != 0.0f || movY != 0.0f) {
-      // --- REDUCCIÓN DE ÁNGULO (REDUCIR X EN LUGAR DE Y) ---
-      // Al pulsar una diagonal (ambos ejes activos), reducimos la fuerza
-      // horizontal. Con 0.30f obligamos a que el personaje vaya sobre todo
-      // hacia arriba/abajo y se desvíe muy sutilmente hacia los lados, cerrando
-      // el ángulo visual.
+      // Calibración de diagonales para la X lenta (65%) que pusimos antes
       if (movX != 0.0f && movY != 0.0f) {
-        movX *= 0.30f; // NHR: Ojo, si se cambia la velocidad vertical hay que
-                       // cambiar también este valor para que el
-                       //      movimiento diagonal siga mas o menos paralelo a
-                       //      las paredes laterales.
+        movX *= 0.55f;
       }
 
-      // Normalizamos el vector resultante para mantener la velocidad uniforme
+      // Normalización del vector de entrada
       float longitud = sqrtf(movX * movX + movY * movY);
       movX /= longitud;
       movY /= longitud;
 
-      // --- COMPENSACIÓN ÓPTICA DEL ABANICO (Para subir recto) ---
-      float profundidadVisualFija = 220.0f;
-      float factorY = jugadorY / profundidadVisualFija;
-      if (factorY < 0.0f)
-        factorY = 0.0f;
-      if (factorY > 1.0f)
-        factorY = 1.0f;
-
-      float pasoX = movX * velocidad * dt;
-      float pasoY =
-          movY * velocidad * dt; // NHR: Si se quiere más rápidez en el
-                                 // desplazamiento vertical, multiplica por un
-                                 //       factor 1.5f o 2.0f.
-      if (movY != 0.0f) {
-        float centroSala = s.ancho / 2.0f;
-        float desviacion = jugadorX - centroSala;
-        pasoX += (desviacion * (0.45f / profundidadVisualFija)) * pasoY;
-      }
+      // AVANCE LOGÍSTICO INICIAL (Calculamos el paso de forma independiente)
+      float pasoX = movX * (velocidad * 0.65f) * dt;
+      float pasoY = movY * velocidad * dt;
 
       jugadorX += pasoX;
       jugadorY += pasoY;
@@ -193,8 +174,6 @@ int main(void) {
       bool enHuecoPuerta = false;
       for (int i = 0; i < s.cantidadPuertas; i++) {
         Puerta p = s.puertas[i];
-        // Comprobamos si el jugador está alineado con el rango físico de la
-        // puerta
         if (p.muro == MURO_IZQUIERDO &&
             jugadorY >= (p.posicion - p.ancho / 2.0f) &&
             jugadorY <= (p.posicion + p.ancho / 2.0f)) {
@@ -204,8 +183,6 @@ int main(void) {
           break;
         }
       }
-      // Si chocó contra el muro y NO era una puerta, anulamos el movimiento
-      // horizontal
       if (!enHuecoPuerta)
         jugadorX = antiguoX;
     }
@@ -229,7 +206,8 @@ int main(void) {
     }
 
     // --- COLISIÓN EN MURO DEL FONDO (Y > s.largo) ---
-    if (jugadorY > s.largo && !cambiadoDeSala) {
+    // Aplicamos el margen de entrada a la puerta de +15.0f que calibramos ayer
+    if (jugadorY > (s.largo + 15.0f) && !cambiadoDeSala) {
       bool enHuecoPuerta = false;
       for (int i = 0; i < s.cantidadPuertas; i++) {
         Puerta p = s.puertas[i];
@@ -243,13 +221,46 @@ int main(void) {
       }
       if (!enHuecoPuerta)
         jugadorY = antiguoY;
+    } else if (jugadorY > s.largo && !cambiadoDeSala) {
+      bool enHuecoPuerta = false;
+      for (int i = 0; i < s.cantidadPuertas; i++) {
+        Puerta p = s.puertas[i];
+        if (p.muro == MURO_FONDO && jugadorX >= (p.posicion - p.ancho / 2.0f) &&
+            jugadorX <= (p.posicion + p.ancho / 2.0f)) {
+          enHuecoPuerta = true;
+          break;
+        }
+      }
+      if (!enHuecoPuerta)
+        jugadorY = antiguoY;
     }
 
     // --- COLISIÓN EN EL FRENTE DE LA SALA (Y < 0) ---
-    // En Dragontorc el frente está abierto visualmente pero bloqueado
-    // físicamente para no caer al vacío
     if (jugadorY < 0)
       jugadorY = antiguoY;
+
+    // 4. NUEVA SECCIÓN: COMPENSACIÓN ÓPTICA DEL ABANICO (SOLO SI EL MOVIMIENTO
+    // FUE VÁLIDO) Si el jugador ha chocado y ha sido devuelto a antiguoY,
+    // jugadorY será igual a antiguoY, por lo que no se aplicará ningún
+    // desplazamiento lateral indeseado.
+    if (movY != 0.0f && jugadorY != antiguoY) {
+      float profundidadVisualFija = 220.0f;
+      float factorY = jugadorY / profundidadVisualFija;
+      if (factorY < 0.0f)
+        factorY = 0.0f;
+      if (factorY > 1.0f)
+        factorY = 1.0f;
+
+      float pasoY =
+          (jugadorY -
+           antiguoY); // Calculamos el avance vertical real neto que ha ocurrido
+      float centroSala = s.ancho / 2.0f;
+      float desviacion = jugadorX - centroSala;
+
+      // Aplicamos la corrección de fuga en X solo basándonos en el movimiento
+      // vertical real permitido
+      jugadorX += (desviacion * (0.45f / profundidadVisualFija)) * pasoY;
+    }
 
     // --- PROCESAMIENTO DE LA APARICIÓN EN LA PAREJA DE LA PUERTA ---
     if (cambiadoDeSala) {
@@ -397,10 +408,70 @@ int main(void) {
         DrawLineV(baseFondo, baseFrente, BLACK);
       }
     }
-    // JUGADOR CONGELADO EN EL CENTRO
-    DrawRectangle(centroPantallaX - 15, centroPantallaY - 50, 30, 50, WHITE);
-    DrawRectangleLines(centroPantallaX - 15, centroPantallaY - 50, 30, 50,
-                       s.colorMuro);
+    // --- DIBUJADO DEL PERSONAJE ESTILO DRAGONTORC ---
+    // 1. Conseguimos la posición proyectada exacta de los "pies" (el suelo)
+    Vector2 jSueloProyectado =
+        ProyeccionGeometriaSala(jugadorX, jugadorY, s.ancho);
+
+    // Aplicamos el scroll de cámara a las coordenadas proyectadas
+    Vector2 posSueloPantalla = {jSueloProyectado.x + scroll2DX,
+                                jSueloProyectado.y + scroll2DY};
+
+    // Dibujamos la SOMBRA (Círculo/Óvalo de colisión e interacción)
+    // Se dibuja en negro/gris translúcido justo encima de las baldosas
+    DrawEllipse(posSueloPantalla.x, posSueloPantalla.y, 16.0f, 8.0f,
+                GetColor(0x00000044));
+
+    // 2. Calculamos la levitación flotante (Oscilación matemática usando Seno)
+    tiempoLevitacion += dt * 4.0f; // Controla la velocidad del balanceo
+    float desfaseFlotando =
+        sinf(tiempoLevitacion) * 4.0f; // Amplitud del balanceo (4 píxeles)
+
+    // La posición del cuerpo visual se desplaza hacia arriba sumando la base Z
+    // + el balanceo
+    float desplazamientoVisualY = jugadorZ + desfaseFlotando;
+
+    // --- DIBUJADO DEL PERSONAJE FLOTANTE Y SU SOMBRA EN EL SUELO ---
+
+    // 1. Calculamos la posición visual exacta de los "pies" del jugador en el
+    // mapa
+    jSueloProyectado = ProyeccionGeometriaSala(jugadorX, jugadorY, s.ancho);
+
+    // Aplicamos el scroll de la cámara para centrarlo en la pantalla
+    posSueloPantalla.x = jSueloProyectado.x + scroll2DX;
+    posSueloPantalla.y = jSueloProyectado.y + scroll2DY;
+
+    // -------------------------------------------------------------------------
+    // DIBUJAR LA SOMBRA (El círculo físico de interacción)
+    // Dibujamos un óvalo negro semi-transparente pegado a las baldosas.
+    // Al pasar por encima de las líneas del suelo, se verá perfectamente.
+    // -------------------------------------------------------------------------
+    // Cambiamos el color a Blanco Puro (255, 255, 255)
+    // Mantenemos la opacidad en 85 sobre 255 para que sea translúcida y deje
+    // ver las baldosas
+    DrawEllipse(posSueloPantalla.x, posSueloPantalla.y, 16.0f, 8.0f,
+                (Color){255, 255, 255, 85});
+
+    // 2. Calculamos la levitación del cuerpo (Efecto "bobbing" flotante con
+    // Seno)
+    tiempoLevitacion += dt * 4.0f; // Velocidad del vaivén
+    desfaseFlotando =
+        sinf(tiempoLevitacion) * 3.5f; // Amplitud (sube y baja 3.5 píxeles)
+
+    // El cuerpo visual flota a una altura fija (12.0f) más el balanceo
+    // matemático
+    float alturaVisualTotal = jugadorZ + desfaseFlotando;
+
+    // -------------------------------------------------------------------------
+    // DIBUJAR EL CUERPO FLOTANTE (El cubo blanco)
+    // Desplazamos el cubo hacia arriba usando 'alturaVisualTotal'
+    // -------------------------------------------------------------------------
+    float cuboAncho = 20.0f;
+    float cuboAlto = 35.0f;
+    DrawRectangle(posSueloPantalla.x - cuboAncho / 2.0f,
+                  posSueloPantalla.y - cuboAlto - alturaVisualTotal, cuboAncho,
+                  cuboAlto, WHITE);
+
     // INTERFAZ
     DrawRectangle(0, 450, screenWidth, 150, GOLD);
     DrawRectangleLines(10, 460, screenWidth - 20, 130, BLACK);
