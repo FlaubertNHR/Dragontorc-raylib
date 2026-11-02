@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "math.h"
 
 const int screenWidth = 800;
 const int screenHeight = 600;
@@ -66,7 +67,9 @@ Vector2 ProyeccionGeometriaSala(float x, float y, float anchoSala)
 
 int main(void)
 {
-    InitWindow(screenWidth, screenHeight, "Dragontorc Remake - Puertas Uno a Uno");
+    // Cambia el título de la ventana para verificar que compila el código correcto
+    InitWindow(screenWidth, screenHeight, "PRUEBA DE COMPILACION - NUEVO CODIGO");
+   
     SetTargetFPS(60);
 
     // --- ENLAZANDO LAS PUERTAS DEL MAPA EN PAREJAS STRICTAS ---
@@ -110,11 +113,48 @@ int main(void)
         float antiguoX = jugadorX;
         float antiguoY = jugadorY;
 
-        // 2. CAPTURAR EL INPUT DEL USUARIO
-        if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) jugadorX += velocidad * dt;
-        if (IsKeyDown(KEY_LEFT)  || IsKeyDown(KEY_A)) jugadorX -= velocidad * dt;
-        if (IsKeyDown(KEY_DOWN)  || IsKeyDown(KEY_S)) jugadorY -= velocidad * dt; 
-        if (IsKeyDown(KEY_UP)    || IsKeyDown(KEY_W)) jugadorY += velocidad * dt;
+        // 2. CAPTURAR EL INPUT DEL USUARIO (DIAGONALES CERRADAS - CORRECCIÓN DE EJE X)
+        float movX = 0.0f;
+        float movY = 0.0f;
+
+        if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) movX += 1.0f;
+        if (IsKeyDown(KEY_LEFT)  || IsKeyDown(KEY_A)) movX -= 1.0f;
+        if (IsKeyDown(KEY_UP)    || IsKeyDown(KEY_W)) movY += 1.0f; // Sube hacia el fondo
+        if (IsKeyDown(KEY_DOWN)  || IsKeyDown(KEY_S)) movY -= 1.0f; // Baja hacia el frente
+
+        if (movX != 0.0f || movY != 0.0f) {
+            // --- REDUCCIÓN DE ÁNGULO (REDUCIR X EN LUGAR DE Y) ---
+            // Al pulsar una diagonal (ambos ejes activos), reducimos la fuerza horizontal.
+            // Con 0.30f obligamos a que el personaje vaya sobre todo hacia arriba/abajo 
+            // y se desvíe muy sutilmente hacia los lados, cerrando el ángulo visual.
+            if (movX != 0.0f && movY != 0.0f) {
+                movX *= 0.30f;  // NHR: Ojo, si se cambia la velocidad vertical hay que cambiar también este valor para que el 
+                                //      movimiento diagonal siga mas o menos paralelo a las paredes laterales.
+            }
+
+            // Normalizamos el vector resultante para mantener la velocidad uniforme
+            float longitud = sqrtf(movX * movX + movY * movY);
+            movX /= longitud;
+            movY /= longitud;
+
+            // --- COMPENSACIÓN ÓPTICA DEL ABANICO (Para subir recto) ---
+            float profundidadVisualFija = 220.0f;
+            float factorY = jugadorY / profundidadVisualFija;
+            if (factorY < 0.0f) factorY = 0.0f;
+            if (factorY > 1.0f) factorY = 1.0f;
+
+            float pasoX = movX * velocidad * dt;
+            float pasoY = movY * velocidad * dt; // NHR: Si se quiere más rápidez en el desplazamiento vertical, multiplica por un
+                                                //       factor 1.5f o 2.0f. 
+            if (movY != 0.0f) {
+                float centroSala = s.ancho / 2.0f;
+                float desviacion = jugadorX - centroSala;
+                pasoX += (desviacion * (0.45f / profundidadVisualFija)) * pasoY;
+            }
+
+            jugadorX += pasoX;
+            jugadorY += pasoY;
+        }
 
         // 3. SISTEMA DE COLISIONES DINÁMICAS CONTRA MUROS CIEGOS
         bool cambiadoDeSala = false;
