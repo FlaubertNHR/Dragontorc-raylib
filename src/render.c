@@ -47,16 +47,10 @@ void DrawWalls(const Room *room, Vector2 scroll) {
     DrawLineV(rightBottom, (Vector2){ rightBottom.x, rightBottom.y - room->wallHeight }, room->wallColor);
 }
 
-static void DrawBackDoor(const Door *door, const Room *room, Vector2 scroll) {
+static void DrawBackDoorHole(const Door *door, const Room *room, Vector2 scroll) {
     Vector2 doorBase = ProjectRoomPoint(door->position, room->length, room->width);
     doorBase.x += scroll.x;
     doorBase.y += scroll.y;
-
-    if (door->state == DOOR_FREE_EXIT) {
-        DrawRectangle(doorBase.x - door->width / 2.0f, doorBase.y - door->height, door->width, door->height, BLACK);
-        DrawRectangleLinesEx((Rectangle){ doorBase.x - door->width / 2.0f, doorBase.y - door->height, door->width, door->height }, 2.0f, door->color);
-        return;
-    }
 
     Color fillColor = (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) ? DARKGRAY : BLACK;
     DrawRectangle(doorBase.x - door->width / 2.0f, doorBase.y - door->height, door->width, door->height, fillColor);
@@ -64,35 +58,36 @@ static void DrawBackDoor(const Door *door, const Room *room, Vector2 scroll) {
 
     if (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) {
         DrawText("X", doorBase.x - 5, doorBase.y - door->height / 2.0f - 5, 12, RED);
-    } else if (door->openProgress > 0.0f) {
-        Vector2 hingeBottom = { doorBase.x - door->width / 2.0f, doorBase.y };
-        Vector2 hingeTop    = { hingeBottom.x, hingeBottom.y - door->height };
-
-        float leafLength = door->width * 0.85f; // We can adjust final size here
-        // Opening angle
-        // 0.0 rad = CLOSED (leaf extended along right wall)
-        // MAX_ANGLE rad = OPEN (leaf rotated X degrees toward the player / the room's interior)
-        const float MAX_ANGLE = (PI / 2.0f) * 0.78f; // We can adjust final angle here
-        float angle = door->openProgress * MAX_ANGLE;
-
-         // Continuous rotation on the ground plane:
-        // cos(angle) = 1 when closed (extension to the right), 0 when open
-        // sin(angle) = 0 when closed, 1 when open (projection toward the front along the isometric Y-axis)
-        // The X-component tilts toward the left as it opens, in order to align with the visual vanishing point          
-        float dx = leafLength * cosf(angle) - (leafLength * 0.75f) * sinf(angle);
-        float dy = (leafLength * 0.40f) * sinf(angle); // Descent in perspective toward the ground
-
-        Vector2 edgeBottom = { hingeBottom.x + dx, hingeBottom.y + dy };
-        Vector2 edgeTop    = { edgeBottom.x, edgeBottom.y - door->height };
-
-        Color doorLeafColor = { 25, 25, 25, 255 };
-        DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
-        DrawTriangle(hingeTop, edgeTop, edgeBottom, doorLeafColor);
-
-        DrawLineEx(hingeBottom, edgeBottom, 2.5f, door->color);
-        DrawLineEx(edgeBottom, edgeTop, 2.5f, door->color);
-        DrawLineEx(edgeTop, hingeTop, 2.5f, door->color);
     }
+}
+
+static void DrawBackDoorLeaf(const Door *door, const Room *room, Vector2 scroll) {
+    if (door->state == DOOR_FREE_EXIT || door->openProgress <= 0.0f) return;
+
+    Vector2 doorBase = ProjectRoomPoint(door->position, room->length, room->width);
+    doorBase.x += scroll.x;
+    doorBase.y += scroll.y;
+
+    Vector2 hingeBottom = { doorBase.x - door->width / 2.0f, doorBase.y };
+    Vector2 hingeTop    = { hingeBottom.x, hingeBottom.y - door->height };
+
+    float leafLength = door->width * 0.85f;
+    const float MAX_ANGLE = (PI / 2.0f) * 0.78f;
+    float angle = door->openProgress * MAX_ANGLE;
+
+    float dx = leafLength * cosf(angle) - (leafLength * 0.60f) * sinf(angle);
+    float dy = (leafLength * 0.35f) * sinf(angle);
+
+    Vector2 edgeBottom = { hingeBottom.x + dx, hingeBottom.y + dy };
+    Vector2 edgeTop    = { edgeBottom.x, edgeBottom.y - door->height };
+
+    Color doorLeafColor = { 25, 25, 25, 255 };
+    DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
+    DrawTriangle(hingeTop, edgeTop, edgeBottom, doorLeafColor);
+
+    DrawLineEx(hingeBottom, edgeBottom, 2.5f, door->color);
+    DrawLineEx(edgeBottom, edgeTop, 2.5f, door->color);
+    DrawLineEx(edgeTop, hingeTop, 2.5f, door->color);
 }
 
 static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
@@ -150,10 +145,10 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
             wallDir.y = doorwayVector.y / doorwayPixelSpan;
         }
 
-        // Ángulo de rotación de 0 a PI/2
+        // Rotation angle from 0 to PI/2
         float angle = door->openProgress * (PI / 2.0f);
 
-        // Vector normal hacia el interior de la sala
+        // Normal vector pointing toward the interior of the room
         float inwardX = (door->wall == WALL_LEFT) ? 1.0f : -1.0f;
 
         Vector2 edgeBottom;
@@ -178,13 +173,92 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
     }
 }
 
-void DrawDoors(const Room *room, Vector2 scroll) {
+static bool IsDoorInFrontOfPlayer(const Door *door, const Room *room, const Player *player) {
+    if (door->wall == WALL_BACK) {
+        // Only occludes if the player has physically moved past the back wall,
+        // entering the space of the outer tunnel.      
+        return player->y > room->length;
+    }
+
+    // Side doors (WALL_LEFT and WALL_RIGHT):
+    float yBack  = door->position + (door->width / 2.0f);
+    float leafSpan = door->height * 0.75f;
+
+    // It only occludes if it is behind the hinge and flush against that wall
+    if (door->wall == WALL_LEFT) {
+        bool behindInY = (player->y > (yBack - 6.0f));
+        bool nearWallX = (player->x >= 0.0f && player->x <= (leafSpan + 4.0f));
+        return (behindInY && nearWallX && door->openProgress > 0.0f);
+    } else if (door->wall == WALL_RIGHT) {
+        bool behindInY = (player->y > (yBack - 6.0f));
+        bool nearWallX = (player->x >= (room->width - leafSpan - 4.0f) && player->x <= room->width);
+        return (behindInY && nearWallX && door->openProgress > 0.0f);
+    }
+
+    return false;
+}
+
+static bool IsLeafInFrontOfPlayer(const Door *door, const Room *room, const Player *player) {
+    if (door->state == DOOR_FREE_EXIT || door->openProgress <= 0.0f) return false;
+
+    // On the back wall, the panel pivots toward the front and to the left.
+    // It only obscures the character if they walk toward the wall directly behind the plank.
+    if (door->wall == WALL_BACK) {
+        float hingeX = door->position - (door->width / 2.0f);
+        // If the player is closer to the wall than the tip of the door leaf (along the Y-axis) and to the left of the hinge (along the X-axis)
+        bool behindInY = (player->y >= (room->length - 12.0f));
+        bool behindInX = (player->x <= hingeX && player->x >= (hingeX - door->width * 0.6f));
+        return (behindInY && behindInX);
+    }
+
+    // Side doors (WALL_LEFT and WALL_RIGHT):
+    float yBack = door->position + (door->width / 2.0f);
+    float leafSpan = door->height * 0.75f;
+
+    if (door->wall == WALL_LEFT) {
+        bool behindInY = (player->y > (yBack - 6.0f));
+        bool nearWallX = (player->x >= 0.0f && player->x <= (leafSpan + 4.0f));
+        return (behindInY && nearWallX);
+    } else if (door->wall == WALL_RIGHT) {
+        bool behindInY = (player->y > (yBack - 6.0f));
+        bool nearWallX = (player->x >= (room->width - leafSpan - 4.0f) && player->x <= room->width);
+        return (behindInY && nearWallX);
+    }
+
+    return false;
+}
+
+void DrawDoorsBehind(const Room *room, const Player *player, Vector2 scroll) {
     for (int i = 0; i < room->doorCount; i++) {
         const Door *door = &room->doors[i];
+
         if (door->wall == WALL_BACK) {
-            DrawBackDoor(door, room, scroll);
+            // The black void in the background is ALWAYS drawn behind the player
+            DrawBackDoorHole(door, room, scroll);
+            // If the leaf is not in front, it is drawn here
+            if (!IsLeafInFrontOfPlayer(door, room, player)) {
+                DrawBackDoorLeaf(door, room, scroll);
+            }
         } else {
-            DrawSideDoor(door, room, scroll);
+            // For sides, if it is not in front, it is drawn in its entirety
+            if (!IsLeafInFrontOfPlayer(door, room, player)) {
+                DrawSideDoor(door, room, scroll);
+            }
+        }
+    }
+}
+
+void DrawDoorsInFront(const Room *room, const Player *player, Vector2 scroll) {
+    for (int i = 0; i < room->doorCount; i++) {
+        const Door *door = &room->doors[i];
+
+        if (IsLeafInFrontOfPlayer(door, room, player)) {
+            if (door->wall == WALL_BACK) {
+                // Only draw the wooden board, NEVER the black rectangle
+                DrawBackDoorLeaf(door, room, scroll);
+            } else {
+                DrawSideDoor(door, room, scroll);
+            }
         }
     }
 }

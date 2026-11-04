@@ -101,14 +101,16 @@ void UpdateGame(Game *game) {
 
 void RenderGame(const Game *game) {
     const Room *room = &game->rooms[game->currentRoom];
+    const Player *player = &game->player;
 
     BeginDrawing();
     ClearBackground(BLACK);
 
     DrawFloorGrid(room, game->cameraScroll);
     DrawWalls(room, game->cameraScroll);
-    DrawDoors(room, game->cameraScroll);
+    DrawDoorsBehind(room, player, game->cameraScroll);
     DrawPlayer(game);
+    DrawDoorsInFront(room, player, game->cameraScroll);
     DrawHUD(game);
 
     EndDrawing();

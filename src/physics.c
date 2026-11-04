@@ -76,14 +76,16 @@ void TransitionToRoom(Game *game, const Door *crossedDoor) {
         Door *dest = &nextRoom->doors[i];
         if (dest->id == targetDoorId) {
             if (dest->wall == WALL_LEFT) {
-                game->player.x = 3.0f;
+                game->player.x = 8.0f; // A step inward
                 game->player.y = dest->position;
             } else if (dest->wall == WALL_RIGHT) {
-                game->player.x = nextRoom->width - 3.0f;
+                game->player.x = nextRoom->width - 8.0f; // A step inward
                 game->player.y = dest->position;
             } else if (dest->wall == WALL_BACK) {
                 game->player.x = dest->position;
-                game->player.y = nextRoom->length - 12.0f;
+                // We shift the position toward the front of the room so that it does not end up
+                // buried beneath the lintel or inside the black frame
+                game->player.y = nextRoom->length - 30.0f;
             }
             break;
         }
@@ -185,25 +187,44 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX, float m
         for (int i = 0; i < r->doorCount; i++) {
             Door *d = &r->doors[i];
             if (d->state == DOOR_OPEN) {
+                // Position of the leaf line on the floor (rear frame where the hinge is located)                
+                float leafY = d->position + (d->width / 2.0f);
                 float leafLength = d->height * 0.75f;
+
+                // In the on-screen projection, the vertical radius of the shadow cast on the ground
+                // corresponds to approximately 4.5–5.5 logical Y units (SHADOW_RADIUS_Y / 1.55f).
+                // The bottom edge of the shadow on screen corresponds to (p->y - shadowBottomRadius).
+                const float SHADOW_BOTTOM_OFFSET = 5.0f;
+
                 if (d->wall == WALL_LEFT) {
-                    if (p->x >= 0.0f && p->x <= leafLength) {
-                        if (prevY >= d->position && p->y < d->position) {
+                    if (p->x >= 0.0f && p->x <= (leafLength + 6.0f)) {
+                        // Bottom edge of the shadow ellipse in the previous and current frame
+                        float prevShadowBottom = prevY - SHADOW_BOTTOM_OFFSET;
+                        float currShadowBottom = p->y - SHADOW_BOTTOM_OFFSET;
+
+                        // It is triggered at the exact moment the bottom edge of the shadow
+                        // reaches the line where the blade makes contact with the ground
+                        if (prevShadowBottom >= leafY && currShadowBottom <= leafY) {
                             d->state = DOOR_CLOSING;
-                            p->y = d->position + 8.0f;
+                            // We position the bottom of the shadow just above the line of the leafa
+                            p->y = leafY + SHADOW_BOTTOM_OFFSET;
                         }
                     }
                 } else if (d->wall == WALL_RIGHT) {
-                    if (p->x >= (r->width - leafLength) && p->x <= r->width) {
-                        if (prevY >= d->position && p->y < d->position) {
+                    float wallStartX = r->width - leafLength;
+                    if (p->x >= (wallStartX - 6.0f) && p->x <= r->width) {
+                        float prevShadowBottom = prevY - SHADOW_BOTTOM_OFFSET;
+                        float currShadowBottom = p->y - SHADOW_BOTTOM_OFFSET;
+
+                        if (prevShadowBottom >= leafY && currShadowBottom <= leafY) {
                             d->state = DOOR_CLOSING;
-                            p->y = d->position + 8.0f;
+                            p->y = leafY + SHADOW_BOTTOM_OFFSET;
                         }
                     }
                 }
             }
         }
-    }
+    }    
 
     // --- 5. CLOSE BACK DOOR VIA HORIZONTAL PUSH (moveX > 0) ---
     if (moveX > 0.0f) {
