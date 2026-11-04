@@ -1,5 +1,6 @@
 #include "render.h"
 #include "projection.h"
+#include <math.h>
 
 void DrawFloorGrid(const Room *room, Vector2 scroll) {
     for (float x = 0; x <= room->width; x += TILE_SIZE) {
@@ -57,17 +58,32 @@ static void DrawBackDoor(const Door *door, const Room *room, Vector2 scroll) {
         return;
     }
 
-    Color fillColor = (door->state == DOOR_CLOSED) ? DARKGRAY : BLACK;
+    Color fillColor = (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) ? DARKGRAY : BLACK;
     DrawRectangle(doorBase.x - door->width / 2.0f, doorBase.y - door->height, door->width, door->height, fillColor);
     DrawRectangleLinesEx((Rectangle){ doorBase.x - door->width / 2.0f, doorBase.y - door->height, door->width, door->height }, 2.0f, door->color);
 
-    if (door->state == DOOR_CLOSED) {
+    if (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) {
         DrawText("X", doorBase.x - 5, doorBase.y - door->height / 2.0f - 5, 12, RED);
-    } else if (door->state == DOOR_OPEN) {
+    } else if (door->openProgress > 0.0f) {
         Vector2 hingeBottom = { doorBase.x - door->width / 2.0f, doorBase.y };
-        Vector2 hingeTop    = { doorBase.x - door->width / 2.0f, doorBase.y - door->height };
-        Vector2 edgeBottom  = { doorBase.x - door->width / 2.0f - door->width * 0.75f, doorBase.y + door->height * 0.25f };
-        Vector2 edgeTop     = { edgeBottom.x, edgeBottom.y - door->height };
+        Vector2 hingeTop    = { hingeBottom.x, hingeBottom.y - door->height };
+
+        float leafLength = door->width * 0.85f; // We can adjust final size here
+        // Opening angle
+        // 0.0 rad = CLOSED (leaf extended along right wall)
+        // MAX_ANGLE rad = OPEN (leaf rotated X degrees toward the player / the room's interior)
+        const float MAX_ANGLE = (PI / 2.0f) * 0.78f; // We can adjust final angle here
+        float angle = door->openProgress * MAX_ANGLE;
+
+         // Continuous rotation on the ground plane:
+        // cos(angle) = 1 when closed (extension to the right), 0 when open
+        // sin(angle) = 0 when closed, 1 when open (projection toward the front along the isometric Y-axis)
+        // The X-component tilts toward the left as it opens, in order to align with the visual vanishing point          
+        float dx = leafLength * cosf(angle) - (leafLength * 0.75f) * sinf(angle);
+        float dy = (leafLength * 0.40f) * sinf(angle); // Descent in perspective toward the ground
+
+        Vector2 edgeBottom = { hingeBottom.x + dx, hingeBottom.y + dy };
+        Vector2 edgeTop    = { edgeBottom.x, edgeBottom.y - door->height };
 
         Color doorLeafColor = { 25, 25, 25, 255 };
         DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
@@ -101,7 +117,7 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
         return;
     }
 
-    Color fillColor = (door->state == DOOR_CLOSED) ? DARKGRAY : BLACK;
+    Color fillColor = (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) ? DARKGRAY : BLACK;
 
     if (door->wall == WALL_LEFT) {
         DrawTriangle(baseFront, baseBack, roofFront, fillColor);
@@ -116,18 +132,34 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
     DrawLineEx(roofBack,  baseBack,  2.0f, door->color);
     DrawLineEx(baseBack,  baseFront, 2.0f, door->color);
 
-    if (door->state == DOOR_CLOSED) {
+    if (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) {
         float centerX = (baseFront.x + baseBack.x) / 2.0f;
         float centerY = (baseFront.y + baseBack.y) / 2.0f - door->height / 2.0f;
         DrawText("X", centerX - 4, centerY - 5, 12, RED);
-    } else if (door->state == DOOR_OPEN) {
+    } else if (door->openProgress > 0.0f) {
         Vector2 hingeBottom = baseBack;
         Vector2 hingeTop    = roofBack;
-        float leafWidthPixels = door->height * 0.75f;
+
+        Vector2 doorwayVector = { baseFront.x - baseBack.x, baseFront.y - baseBack.y };
+        float doorwayPixelSpan = sqrtf(doorwayVector.x * doorwayVector.x + doorwayVector.y * doorwayVector.y);
+        float leafLength = doorwayPixelSpan * 1.1f; // NHR: Put a bigger number (now is 110%) for a larger open door
+
+        Vector2 wallDir = { 0.0f, 0.0f };
+        if (doorwayPixelSpan > 0.0f) {
+            wallDir.x = doorwayVector.x / doorwayPixelSpan;
+            wallDir.y = doorwayVector.y / doorwayPixelSpan;
+        }
+
+        // Ángulo de rotación de 0 a PI/2
+        float angle = door->openProgress * (PI / 2.0f);
+
+        // Vector normal hacia el interior de la sala
+        float inwardX = (door->wall == WALL_LEFT) ? 1.0f : -1.0f;
 
         Vector2 edgeBottom;
-        edgeBottom.x = (door->wall == WALL_LEFT) ? (baseBack.x + leafWidthPixels) : (baseBack.x - leafWidthPixels);
-        edgeBottom.y = baseBack.y;
+        edgeBottom.x = hingeBottom.x + (wallDir.x * leafLength * cosf(angle)) + (inwardX * leafLength * sinf(angle));
+        edgeBottom.y = hingeBottom.y + (wallDir.y * leafLength * cosf(angle));
+
         Vector2 edgeTop = { edgeBottom.x, edgeBottom.y - door->height };
 
         Color doorLeafColor = { 25, 25, 25, 255 };

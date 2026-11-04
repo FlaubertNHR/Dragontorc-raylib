@@ -29,9 +29,9 @@ static void InitWorldMap(Game *game) {
         .wallColor = RED,
         .name = "CAVERNS OF DOOM",
         .doors = {
-            { 10, WALL_BACK,  180.0f, 60.0f, 85.0f, RED,    2, 30, DOOR_CLOSED },
-            { 11, WALL_RIGHT,  60.0f, 35.0f, 85.0f, MAROON, 1, 20, DOOR_OPEN },
-            { 12, WALL_RIGHT, 160.0f, 35.0f, 85.0f, MAROON, 1, 21, DOOR_FREE_EXIT }
+            { 10, WALL_BACK,  180.0f, 60.0f, 85.0f, RED,    2, 30, DOOR_CLOSED, 0.0f },
+            { 11, WALL_RIGHT,  60.0f, 35.0f, 85.0f, MAROON, 1, 20, DOOR_OPEN, 1.0f },
+            { 12, WALL_RIGHT, 160.0f, 35.0f, 85.0f, MAROON, 1, 21, DOOR_FREE_EXIT, 1.0f } 
         },
         .doorCount = 3
     };
@@ -44,9 +44,9 @@ static void InitWorldMap(Game *game) {
         .wallColor = GREEN,
         .name = "GATEHOUSE LEVEL",
         .doors = {
-            { 20, WALL_LEFT,   60.0f, 35.0f, 80.0f, MAROON, 0, 11, DOOR_OPEN },
-            { 21, WALL_LEFT,  160.0f, 35.0f, 80.0f, MAROON, 0, 12, DOOR_OPEN },
-            { 22, WALL_RIGHT, 110.0f, 35.0f, 80.0f, RED,    2, 31, DOOR_OPEN }
+            { 20, WALL_LEFT,   60.0f, 35.0f, 85.0f, MAROON, 0, 11, DOOR_OPEN, 1.0f },
+            { 21, WALL_LEFT,  160.0f, 35.0f, 85.0f, MAROON, 0, 12, DOOR_OPEN, 1.0f  },
+            { 22, WALL_RIGHT, 110.0f, 35.0f, 85.0f, RED,    2, 31, DOOR_OPEN, 1.0f }
         },
         .doorCount = 3
     };
@@ -59,8 +59,8 @@ static void InitWorldMap(Game *game) {
         .wallColor = BLUE,
         .name = "THE CROSSROADS",
         .doors = {
-            { 30, WALL_BACK, 280.0f, 50.0f, 80.0f, RED, 0, 10, DOOR_OPEN },
-            { 31, WALL_BACK,  80.0f, 50.0f, 80.0f, RED, 1, 22, DOOR_OPEN }
+            { 30, WALL_BACK, 280.0f, 60.0f, 85.0f, RED, 0, 10, DOOR_OPEN, 1.0f },
+            { 31, WALL_BACK,  80.0f, 60.0f, 85.0f, RED, 1, 22, DOOR_OPEN, 1.0f }
         },
         .doorCount = 2
     };
@@ -93,6 +93,7 @@ void UpdateGame(Game *game) {
     float moveX = 0.0f;
     float moveY = 0.0f;
 
+    UpdateDoorAnimations(&game->rooms[game->currentRoom], dt);
     UpdatePlayerPhysics(game, &moveX, &moveY, dt);
     UpdateCollisions(game, prevX, prevY, moveX, moveY);
     UpdateGameCamera(game);

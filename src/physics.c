@@ -108,7 +108,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX, float m
                 float centerMarginY = d->width / 4.0f;
                 if (p->y >= (d->position - centerMarginY) && p->y <= (d->position + centerMarginY)) {
                     if (d->state == DOOR_CLOSED) {
-                        d->state = DOOR_OPEN;
+                        d->state = DOOR_OPENING;
                         ApplyBounce(p, BOUNCE_IMPULSE_FORCE, 0.0f);
                         p->x = 0.0f;
                         insideDoorway = false;
@@ -135,7 +135,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX, float m
                 float centerMarginY = d->width / 4.0f;
                 if (p->y >= (d->position - centerMarginY) && p->y <= (d->position + centerMarginY)) {
                     if (d->state == DOOR_CLOSED) {
-                        d->state = DOOR_OPEN;
+                        d->state = DOOR_OPENING;
                         ApplyBounce(p, -BOUNCE_IMPULSE_FORCE, 0.0f);
                         p->x = r->width;
                         insideDoorway = false;
@@ -162,7 +162,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX, float m
                 float centerMarginX = d->width / 4.0f;
                 if (p->x >= (d->position - centerMarginX) && p->x <= (d->position + centerMarginX)) {
                     if (d->state == DOOR_CLOSED) {
-                        d->state = DOOR_OPEN;
+                        d->state = DOOR_OPENING;
                         ApplyBounce(p, 0.0f, -BOUNCE_IMPULSE_FORCE);
                         p->y = r->length;
                         insideDoorway = false;
@@ -189,14 +189,14 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX, float m
                 if (d->wall == WALL_LEFT) {
                     if (p->x >= 0.0f && p->x <= leafLength) {
                         if (prevY >= d->position && p->y < d->position) {
-                            d->state = DOOR_CLOSED;
+                            d->state = DOOR_CLOSING;
                             p->y = d->position + 8.0f;
                         }
                     }
                 } else if (d->wall == WALL_RIGHT) {
                     if (p->x >= (r->width - leafLength) && p->x <= r->width) {
                         if (prevY >= d->position && p->y < d->position) {
-                            d->state = DOOR_CLOSED;
+                            d->state = DOOR_CLOSING;
                             p->y = d->position + 8.0f;
                         }
                     }
@@ -227,7 +227,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX, float m
                 float distY = fabsf(screenShadowPos.y - leafCenterY);
 
                 if (distX < 20.0f && distY < 12.0f) {
-                    d->state = DOOR_CLOSED;
+                    d->state = DOOR_CLOSING;
                     p->x = prevX;
                     break;
                 }
@@ -251,5 +251,31 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX, float m
     // --- 8. TRIGGER ROOM SWITCH ---
     if (hasChangedRoom) {
         TransitionToRoom(game, &crossedDoor);
+    }
+}
+
+void UpdateDoorAnimations(Room *room, float dt) {
+    const float DOOR_SPEED = 2.5f; // It takes ~0.4s
+
+    for (int i = 0; i < room->doorCount; i++) {
+        Door *d = &room->doors[i];
+
+        if (d->state == DOOR_OPENING) {
+            d->openProgress += DOOR_SPEED * dt;
+            if (d->openProgress >= 1.0f) {
+                d->openProgress = 1.0f;
+                d->state = DOOR_OPEN;
+            }
+        } else if (d->state == DOOR_CLOSING) {
+            d->openProgress -= DOOR_SPEED * dt;
+            if (d->openProgress <= 0.0f) {
+                d->openProgress = 0.0f;
+                d->state = DOOR_CLOSED;
+            }
+        } else if (d->state == DOOR_OPEN) {
+            d->openProgress = 1.0f;
+        } else if (d->state == DOOR_CLOSED) {
+            d->openProgress = 0.0f;
+        }
     }
 }
