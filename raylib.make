@@ -28,7 +28,7 @@ ifeq ($(origin AR), default)
   AR = ar
 endif
 RESCOMP = windres
-INCLUDES += -Ibuild/external/raylib-master/src -Ibuild/external/raylib-master/src/external/glfw/include
+INCLUDES += -Ibuild/external/raylib-master/src -Ibuild/external/raylib-master/src/external/glfw/include -Iinclude
 FORCE_INCLUDE +=
 ALL_CPPFLAGS += $(CPPFLAGS) -MD -MP $(DEFINES) $(INCLUDES)
 ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)

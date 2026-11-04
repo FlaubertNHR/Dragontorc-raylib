@@ -118,8 +118,17 @@ endif
 GENERATED :=
 OBJECTS :=
 
-GENERATED += $(OBJDIR)/main.o
-OBJECTS += $(OBJDIR)/main.o
+GENERATED += $(OBJDIR)/main.o \
+			 $(OBJDIR)/game.o \
+			 $(OBJDIR)/physics.o \
+			 $(OBJDIR)/projection.o \
+			 $(OBJDIR)/render.o 
+			 
+OBJECTS += $(OBJDIR)/main.o \
+           $(OBJDIR)/game.o \
+		   $(OBJDIR)/physics.o \
+		   $(OBJDIR)/projection.o \
+		   $(OBJDIR)/render.o
 
 # Rules
 # #############################################
@@ -184,6 +193,22 @@ endif
 # #############################################
 
 $(OBJDIR)/main.o: src/main.c
+	@echo "$(notdir $<)"
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+
+$(OBJDIR)/game.o: src/game.c 
+	@echo "$(notdir $<)"
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"	
+
+$(OBJDIR)/physics.o: src/physics.c
+	@echo "$(notdir $<)"
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+
+$(OBJDIR)/projection.o: src/projection.c	
+	@echo "$(notdir $<)"
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+
+$(OBJDIR)/render.o: src/render.c
 	@echo "$(notdir $<)"
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 
