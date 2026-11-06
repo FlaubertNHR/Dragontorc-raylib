@@ -22,7 +22,11 @@ int LoadMapData(Room rooms[], int maxRooms) {
             { 11, WALL_RIGHT,  60.0f, 35.0f, 85.0f, MAROON, 1, 20, DOOR_OPEN, 1.0f },
             { 12, WALL_RIGHT, 160.0f, 35.0f, 85.0f, MAROON, 1, 21, DOOR_FREE_EXIT, 1.0f } 
         },
-        .doorCount = 3
+        .doorCount = 3,
+        .itemCount =1,
+        .items = {
+            {501, ITEM_TYPE_KEY, "Citadel Gate Key", 60.0f, 70.0f, true, GOLD, 10}
+        }
     };
 
     // =========================================================================
