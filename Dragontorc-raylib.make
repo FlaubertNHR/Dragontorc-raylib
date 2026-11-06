@@ -120,12 +120,14 @@ OBJECTS :=
 
 GENERATED += $(OBJDIR)/main.o \
 			 $(OBJDIR)/game.o \
+			 $(OBJDIR)/map_data.o \
 			 $(OBJDIR)/physics.o \
 			 $(OBJDIR)/projection.o \
 			 $(OBJDIR)/render.o 
 			 
 OBJECTS += $(OBJDIR)/main.o \
            $(OBJDIR)/game.o \
+           $(OBJDIR)/map_data.o \
 		   $(OBJDIR)/physics.o \
 		   $(OBJDIR)/projection.o \
 		   $(OBJDIR)/render.o
@@ -199,6 +201,10 @@ $(OBJDIR)/main.o: src/main.c
 $(OBJDIR)/game.o: src/game.c 
 	@echo "$(notdir $<)"
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"	
+
+$(OBJDIR)/map_data.o: src/map_data.c
+	@echo $(notdir $<)
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 
 $(OBJDIR)/physics.o: src/physics.c
 	@echo "$(notdir $<)"

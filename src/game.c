@@ -2,6 +2,7 @@
 #include "physics.h"
 #include "projection.h"
 #include "render.h"
+#include "map_data.h"
 
 static void InitPlayer(Player *p) {
     p->x = 180.0f;
@@ -17,58 +18,10 @@ static void InitPlayer(Player *p) {
     p->bounceLockoutTimer = 0.0f;
 }
 
-static void InitWorldMap(Game *game) {
-    game->roomCount = 3;
-    game->currentRoom = 0;
-
-    // Room 0: Caverns of Doom
-    game->rooms[0] = (Room){
-        .width = 360.0f,
-        .length = 220.0f,
-        .wallHeight = 140.0f,
-        .wallColor = RED,
-        .name = "CAVERNS OF DOOM",
-        .doors = {
-            { 10, WALL_BACK,  180.0f, 60.0f, 85.0f, RED,    2, 30, DOOR_CLOSED, 0.0f },
-            { 11, WALL_RIGHT,  60.0f, 35.0f, 85.0f, MAROON, 1, 20, DOOR_OPEN, 1.0f },
-            { 12, WALL_RIGHT, 160.0f, 35.0f, 85.0f, MAROON, 1, 21, DOOR_FREE_EXIT, 1.0f } 
-        },
-        .doorCount = 3
-    };
-
-    // Room 1: Gatehouse Level
-    game->rooms[1] = (Room){
-        .width = 240.0f,
-        .length = 220.0f,
-        .wallHeight = 140.0f,
-        .wallColor = GREEN,
-        .name = "GATEHOUSE LEVEL",
-        .doors = {
-            { 20, WALL_LEFT,   60.0f, 35.0f, 85.0f, MAROON, 0, 11, DOOR_OPEN, 1.0f },
-            { 21, WALL_LEFT,  160.0f, 35.0f, 85.0f, MAROON, 0, 12, DOOR_OPEN, 1.0f  },
-            { 22, WALL_RIGHT, 110.0f, 35.0f, 85.0f, RED,    2, 31, DOOR_OPEN, 1.0f }
-        },
-        .doorCount = 3
-    };
-
-    // Room 2: The Crossroads
-    game->rooms[2] = (Room){
-        .width = 560.0f,
-        .length = 220.0f,
-        .wallHeight = 140.0f,
-        .wallColor = BLUE,
-        .name = "THE CROSSROADS",
-        .doors = {
-            { 30, WALL_BACK, 280.0f, 60.0f, 85.0f, RED, 0, 10, DOOR_OPEN, 1.0f },
-            { 31, WALL_BACK,  80.0f, 60.0f, 85.0f, RED, 1, 22, DOOR_OPEN, 1.0f }
-        },
-        .doorCount = 2
-    };
-}
-
 void InitGame(Game *game) {
     InitPlayer(&game->player);
-    InitWorldMap(game);
+    game->roomCount = LoadMapData(game->rooms, MAX_ROOMS);
+    game->currentRoom = 0;
     game->cameraScroll = (Vector2){ 0.0f, 0.0f };
     game->projectedPlayer = (Vector2){ 0.0f, 0.0f };
 }

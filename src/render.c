@@ -98,12 +98,13 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
   Vector2 hingeBottom = {doorBase.x - door->width / 2.0f, doorBase.y};
   Vector2 hingeTop = {hingeBottom.x, hingeBottom.y - door->height};
 
-  float leafLength = door->width * 0.85f;
-  const float MAX_ANGLE = (PI / 2.0f) * 0.78f;
+  float leafLength = door->width * 0.90f; // Value controls leaf length
+  const float MAX_ANGLE = (PI / 2.0f) * 0.88f; // Value controls leaf angle
   float angle = door->openProgress * MAX_ANGLE;
 
-  float dx = leafLength * cosf(angle) - (leafLength * 0.60f) * sinf(angle);
-  float dy = (leafLength * 0.35f) * sinf(angle);
+  // Thsese numbers must also change to adjust when leaf length/angle is changed 
+  float dx = leafLength * cosf(angle) - (leafLength * 0.55f) * sinf(angle);
+  float dy = (leafLength * 0.38f) * sinf(angle);
 
   Vector2 edgeBottom = {hingeBottom.x + dx, hingeBottom.y + dy};
   Vector2 edgeTop = {edgeBottom.x, edgeBottom.y - door->height};
