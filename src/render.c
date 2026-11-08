@@ -338,26 +338,3 @@ void DrawHUD(const Game *game) {
                       room->doorCount),
            20, 48, 14, RAYWHITE);
 }
-
-void DrawServant(const Servant *s, float roomWidth, Vector2 scroll, const Game *game) {
-    if (!s->active) return;
-
-    Vector2 screenPos = ProjectRoomPoint(s->x, s->y, roomWidth);
-    screenPos.x += scroll.x;
-    screenPos.y += scroll.y;
-
-    float pulse = sinf(GetTime() * 14.0f);
-    Color servantColor = (pulse > 0.0f) ? (Color){ 255, 105, 180, 255 } : (Color){ 255, 0, 128, 255 };
-
-    // Luminous body (the center of interaction is the orb itself)
-    Vector2 orbCenter = { screenPos.x, screenPos.y - 6.0f }; 
-    DrawCircleV(orbCenter, 4.5f, servantColor); 
-    DrawCircleLines((int)orbCenter.x, (int)orbCenter.y, 6.5f, (Color){ 255, 192, 203, 190 });
-
-    /*
-    // If an object is being carried, we draw the item's mini-icon floating above the orb
-    if (s->carriedItemId != 0) {
-        DrawItemMiniIcon(s->carriedItemId, (Vector2){ screenPos.x, screenPos.y - 18 }, game);
-    }
-    */
-}
