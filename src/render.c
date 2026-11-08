@@ -82,6 +82,10 @@ static void DrawBackDoorHole(const Door *door, const Room *room,
   if (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) {
     DrawText("X", doorBase.x - 5, doorBase.y - door->height / 2.0f - 5, 12,
              RED);
+    Vector2 knobPos = {doorBase.x + (door->width * 0.25f), // Knob
+                       doorBase.y - (door->height * 0.45f)};
+    DrawCircleV(knobPos, 3.0f, GOLD);
+    DrawCircleLines((int)knobPos.x, (int)knobPos.y, 3.5f, DARKBROWN);
   }
 }
 
@@ -116,6 +120,14 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
   DrawLineEx(hingeBottom, edgeBottom, 2.5f, door->color);
   DrawLineEx(edgeBottom, edgeTop, 2.5f, door->color);
   DrawLineEx(edgeTop, hingeTop, 2.5f, door->color);
+
+  const float handleRatio = 0.85f; // Knob
+  Vector2 knobPos = {
+      hingeBottom.x + (edgeBottom.x - hingeBottom.x) * handleRatio,
+      (hingeBottom.y + (edgeBottom.y - hingeBottom.y) * handleRatio) -
+          (door->height * 0.45f)};
+  DrawCircleV(knobPos, 3.0f, GOLD);
+  DrawCircleLines((int)knobPos.x, (int)knobPos.y, 3.5f, DARKBROWN);
 }
 
 static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
@@ -166,6 +178,13 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
     float centerX = (baseFront.x + baseBack.x) / 2.0f;
     float centerY = (baseFront.y + baseBack.y) / 2.0f - door->height / 2.0f;
     DrawText("X", centerX - 4, centerY - 5, 12, RED);
+
+    float handleAltitude = door->height * 0.45f; // Knob
+    Vector2 knobPos = {baseFront.x + (baseBack.x - baseFront.x) * 0.20f,
+                       (baseFront.y + (baseBack.y - baseFront.y) * 0.20f) -
+                           handleAltitude};
+    DrawCircleV(knobPos, 3.0f, GOLD);
+    DrawCircleLines((int)knobPos.x, (int)knobPos.y, 3.5f, DARKBROWN);
   } else if (door->openProgress > 0.0f) {
     Vector2 hingeBottom = baseBack;
     Vector2 hingeTop = roofBack;
@@ -210,6 +229,15 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
     DrawLineEx(hingeBottom, edgeBottom, 2.5f, door->color);
     DrawLineEx(edgeBottom, edgeTop, 2.5f, door->color);
     DrawLineEx(edgeTop, hingeTop, 2.5f, door->color);
+
+    const float handleRatio = 0.90f; // Knob
+    float handleAltitude = door->height * 0.45f;
+    Vector2 knobPos = {
+        hingeBottom.x + (edgeBottom.x - hingeBottom.x) * handleRatio,
+        (hingeBottom.y + (edgeBottom.y - hingeBottom.y) * handleRatio) -
+            handleAltitude};
+    DrawCircleV(knobPos, 3.0f, GOLD);
+    DrawCircleLines((int)knobPos.x, (int)knobPos.y, 3.5f, DARKBROWN);
   }
 }
 
@@ -361,6 +389,7 @@ void DrawServant(const Servant *s, float roomWidth, Vector2 scroll,
                   (Color){255, 192, 203, 190});
 
   if (s->carriedItemId != 0) {
-    //DrawItemMiniIcon(s->carriedItemId, (Vector2){orbCenter.x, orbCenter.y - 10.0f}, game);
+    // DrawItemMiniIcon(s->carriedItemId, (Vector2){orbCenter.x, orbCenter.y
+    // - 10.0f}, game);
   }
 }

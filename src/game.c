@@ -91,6 +91,7 @@ void UpdateGame(Game *game) {
 
     // Servant takes exclusive movement
     UpdateServantPhysics(game, dt);
+    UpdateServantDoorInteraction(game); // Chequeo de puertas del sirvient
   }
 
   UpdateGameCamera(game);

@@ -385,99 +385,245 @@ void UpdateDoorAnimations(Room *room, float dt) {
 }
 
 void UpdateServantPhysics(Game *game, float dt) {
-    Servant *s = &game->servant;
-    Room *r = &game->rooms[game->currentRoom];
+  Servant *s = &game->servant;
+  Room *r = &game->rooms[game->currentRoom];
 
-    if (!s->active) return;
+  if (!s->active)
+    return;
 
-    float moveX = 0.0f;
-    float moveY = 0.0f;
+  float moveX = 0.0f;
+  float moveY = 0.0f;
 
-    // 1. Keyboard directional input
-    if (IsKeyDown(KEY_RIGHT)) moveX += 1.0f;
-    if (IsKeyDown(KEY_LEFT)) moveX -= 1.0f;
-    if (IsKeyDown(KEY_UP)) moveY -= 1.0f; // Pure screen UP (-Y)
-    if (IsKeyDown(KEY_DOWN)) moveY += 1.0f; // Pure screen DOWN (+Y)
+  // 1. Keyboard directional input
+  if (IsKeyDown(KEY_RIGHT))
+    moveX += 1.0f;
+  if (IsKeyDown(KEY_LEFT))
+    moveX -= 1.0f;
+  if (IsKeyDown(KEY_UP))
+    moveY -= 1.0f; // Pure screen UP (-Y)
+  if (IsKeyDown(KEY_DOWN))
+    moveY += 1.0f; // Pure screen DOWN (+Y)
 
-    if (moveX != 0.0f || moveY != 0.0f) {
-        float inputLength = sqrtf(moveX * moveX + moveY * moveY);
-        moveX /= inputLength;
-        moveY /= inputLength;
+  if (moveX != 0.0f || moveY != 0.0f) {
+    float inputLength = sqrtf(moveX * moveX + moveY * moveY);
+    moveX /= inputLength;
+    moveY /= inputLength;
 
-        // 2. Direct rectilinear displacement in screen pixels
-        s->screenX += moveX * s->speed * dt;
-        s->screenY += moveY * s->speed * dt;
+    // 2. Direct rectilinear displacement in screen pixels
+    s->screenX += moveX * s->speed * dt;
+    s->screenY += moveY * s->speed * dt;
 
-        // 3. Absolute screen viewport padding (never leaves the display window)
-        const float screenPadding = 8.0f;
-        if (s->screenX < screenPadding) s->screenX = screenPadding;
-        if (s->screenX > (SCREEN_WIDTH - screenPadding)) s->screenX = SCREEN_WIDTH - screenPadding;
-        if (s->screenY < screenPadding) s->screenY = screenPadding;
-        if (s->screenY > (SCREEN_HEIGHT - screenPadding)) s->screenY = SCREEN_HEIGHT - screenPadding;
+    // 3. Absolute screen viewport padding (never leaves the display window)
+    const float screenPadding = 8.0f;
+    if (s->screenX < screenPadding)
+      s->screenX = screenPadding;
+    if (s->screenX > (SCREEN_WIDTH - screenPadding))
+      s->screenX = SCREEN_WIDTH - screenPadding;
+    if (s->screenY < screenPadding)
+      s->screenY = screenPadding;
+    if (s->screenY > (SCREEN_HEIGHT - screenPadding))
+      s->screenY = SCREEN_HEIGHT - screenPadding;
 
-        // 4. Vertical limits: front room floor threshold and top of the back wall
-        Vector2 frontFloorCenter = ProjectRoomPoint(r->width * 0.5f, 4.0f, r->width);
-        float maxScreenBottom = frontFloorCenter.y + game->cameraScroll.y;
-        if (s->screenY > maxScreenBottom) {
-            s->screenY = maxScreenBottom;
-        }
-
-        Vector2 backWallBase = ProjectRoomPoint(r->width * 0.5f, r->length, r->width);
-        float minScreenTop = (backWallBase.y - r->wallHeight) + game->cameraScroll.y;
-        if (s->screenY < minScreenTop) {
-            s->screenY = minScreenTop;
-        }
-
-        // =====================================================================
-        // 5. HORIZONTAL LIMITS: OUTERMOST VERTICAL WALL BOUNDARIES
-        // =====================================================================
-        // The outermost vertical edges of the room walls are given by the
-        // front floor corners (x = 0.0f and x = r->width at y = 0.0f).
-        Vector2 leftFrontCorner = ProjectRoomPoint(0.0f, 0.0f, r->width);
-        Vector2 rightFrontCorner = ProjectRoomPoint(r->width, 0.0f, r->width);
-
-        float outermostLeftX  = leftFrontCorner.x + game->cameraScroll.x;
-        float outermostRightX = rightFrontCorner.x + game->cameraScroll.x;
-
-        // Clamp the servant's screen position to these outermost vertical lines
-        if (s->screenX < outermostLeftX) {
-            s->screenX = outermostLeftX;
-        } else if (s->screenX > outermostRightX) {
-            s->screenX = outermostRightX;
-        }
-
-        // =====================================================================
-        // 6. DERIVE LOGICAL COORDINATES (s->x, s->y) FOR ITEM/DOOR INTERACTIONS
-        // =====================================================================
-        float localY = -(s->screenY - game->cameraScroll.y) / (0.45f * 1.3f);
-        if (localY < 4.0f) localY = 4.0f;
-        if (localY > r->length) localY = r->length;
-        s->y = localY;
-
-        // Calculate trapezoid horizontal bounds at current depth (s->y)
-        float factorY = s->y / FIXED_VISUAL_DEPTH;
-        if (factorY < 0.0f) factorY = 0.0f;
-        if (factorY > 1.0f) factorY = 1.0f;
-
-        float frontLeftX = -310.0f;
-        float backLeftX  = -130.0f;
-        float screenLeftLimit = (frontLeftX + (backLeftX - frontLeftX) * factorY) * 1.3f;
-
-        float frontRightX = r->width + 310.0f;
-        float backRightX  = r->width + 130.0f;
-        float screenRightLimit = (frontRightX + (backRightX - frontRightX) * factorY) * 1.3f;
-
-        float visibleRoomWidth = screenRightLimit - screenLeftLimit;
-        float localScreenX = s->screenX - game->cameraScroll.x;
-
-        if (visibleRoomWidth > 0.0f) {
-            float factorX = (localScreenX - screenLeftLimit) / visibleRoomWidth;
-            s->x = factorX * r->width;
-        }
-
-        // Clamp logical coordinates to valid floor ground so dropping an item
-        // always lands strictly inside the playable room scenario
-        if (s->x < 4.0f) s->x = 4.0f;
-        if (s->x > (r->width - 4.0f)) s->x = r->width - 4.0f;
+    // 4. Vertical limits: front room floor threshold and top of the back wall
+    Vector2 frontFloorCenter =
+        ProjectRoomPoint(r->width * 0.5f, 4.0f, r->width);
+    float maxScreenBottom = frontFloorCenter.y + game->cameraScroll.y;
+    if (s->screenY > maxScreenBottom) {
+      s->screenY = maxScreenBottom;
     }
+
+    Vector2 backWallBase =
+        ProjectRoomPoint(r->width * 0.5f, r->length, r->width);
+    float minScreenTop =
+        (backWallBase.y - r->wallHeight) + game->cameraScroll.y;
+    if (s->screenY < minScreenTop) {
+      s->screenY = minScreenTop;
+    }
+
+    // =====================================================================
+    // 5. HORIZONTAL LIMITS: OUTERMOST VERTICAL WALL BOUNDARIES
+    // =====================================================================
+    // The outermost vertical edges of the room walls are given by the
+    // front floor corners (x = 0.0f and x = r->width at y = 0.0f).
+    Vector2 leftFrontCorner = ProjectRoomPoint(0.0f, 0.0f, r->width);
+    Vector2 rightFrontCorner = ProjectRoomPoint(r->width, 0.0f, r->width);
+
+    float outermostLeftX = leftFrontCorner.x + game->cameraScroll.x;
+    float outermostRightX = rightFrontCorner.x + game->cameraScroll.x;
+
+    // Clamp the servant's screen position to these outermost vertical lines
+    if (s->screenX < outermostLeftX) {
+      s->screenX = outermostLeftX;
+    } else if (s->screenX > outermostRightX) {
+      s->screenX = outermostRightX;
+    }
+
+    // =====================================================================
+    // 6. DERIVE LOGICAL COORDINATES (s->x, s->y) FOR ITEM/DOOR INTERACTIONS
+    // =====================================================================
+    float localY = -(s->screenY - game->cameraScroll.y) / (0.45f * 1.3f);
+    if (localY < 4.0f)
+      localY = 4.0f;
+    if (localY > r->length)
+      localY = r->length;
+    s->y = localY;
+
+    // Calculate trapezoid horizontal bounds at current depth (s->y)
+    float factorY = s->y / FIXED_VISUAL_DEPTH;
+    if (factorY < 0.0f)
+      factorY = 0.0f;
+    if (factorY > 1.0f)
+      factorY = 1.0f;
+
+    float frontLeftX = -310.0f;
+    float backLeftX = -130.0f;
+    float screenLeftLimit =
+        (frontLeftX + (backLeftX - frontLeftX) * factorY) * 1.3f;
+
+    float frontRightX = r->width + 310.0f;
+    float backRightX = r->width + 130.0f;
+    float screenRightLimit =
+        (frontRightX + (backRightX - frontRightX) * factorY) * 1.3f;
+
+    float visibleRoomWidth = screenRightLimit - screenLeftLimit;
+    float localScreenX = s->screenX - game->cameraScroll.x;
+
+    if (visibleRoomWidth > 0.0f) {
+      float factorX = (localScreenX - screenLeftLimit) / visibleRoomWidth;
+      s->x = factorX * r->width;
+    }
+
+    // Clamp logical coordinates to valid floor ground so dropping an item
+    // always lands strictly inside the playable room scenario
+    if (s->x < 4.0f)
+      s->x = 4.0f;
+    if (s->x > (r->width - 4.0f))
+      s->x = r->width - 4.0f;
+  }
+}
+
+static Vector2 GetSideDoorHandleScreenPos(const Door *door, const Room *room,
+                                          Vector2 cameraScroll) {
+  float yFront = door->position - (door->width / 2.0f); // Latch / front frame
+  float yBack = door->position + (door->width / 2.0f);  // Hinge / rear frame
+  float xWall = (door->wall == WALL_LEFT) ? 1.0f : (room->width - 1.0f);
+
+  Vector2 baseFront = ProjectRoomPoint(xWall, yFront, room->width);
+  Vector2 baseBack = ProjectRoomPoint(xWall, yBack, room->width);
+  baseFront.x += cameraScroll.x;
+  baseFront.y += cameraScroll.y;
+  baseBack.x += cameraScroll.x;
+  baseBack.y += cameraScroll.y;
+
+  float handleAltitude = door->height * 0.45f;
+  Vector2 handlePos = {0.0f, 0.0f};
+
+  if (door->state == DOOR_CLOSED || door->openProgress <= 0.0f) {
+    // --- PUERTA CERRADA ---
+    // La bisagra está en baseBack. Por tanto, el picaporte está en el lado
+    // opuesto: junto al marco frontal (baseFront), desplazado un 20% hacia el
+    // centro.
+    handlePos.x = baseFront.x + (baseBack.x - baseFront.x) * 0.20f;
+    handlePos.y =
+        (baseFront.y + (baseBack.y - baseFront.y) * 0.20f) - handleAltitude;
+  } else {
+    // --- PUERTA ABIERTA / ABRIÉNDOSE ---
+    // La hoja gira anclada en baseBack. El picaporte está en el borde libre
+    // (edgeBottom)
+    Vector2 hingeBottom = baseBack;
+
+    Vector2 doorwayVector = {baseFront.x - baseBack.x,
+                             baseFront.y - baseBack.y};
+    float doorwayPixelSpan = sqrtf(doorwayVector.x * doorwayVector.x +
+                                   doorwayVector.y * doorwayVector.y);
+    float leafLength = doorwayPixelSpan * 1.1f;
+
+    Vector2 wallDir = {0.0f, 0.0f};
+    if (doorwayPixelSpan > 0.0f) {
+      wallDir.x = doorwayVector.x / doorwayPixelSpan;
+      wallDir.y = doorwayVector.y / doorwayPixelSpan;
+    }
+
+    float angle = door->openProgress * (PI / 2.0f);
+    float inwardX = (door->wall == WALL_LEFT) ? 1.0f : -1.0f;
+
+    // Borde libre exterior de la hoja de madera
+    Vector2 edgeBottom;
+    edgeBottom.x = hingeBottom.x + (wallDir.x * leafLength * cosf(angle)) +
+                   (inwardX * leafLength * sinf(angle));
+    edgeBottom.y = hingeBottom.y + (wallDir.y * leafLength * cosf(angle));
+
+    // El pomo está situado justo en ese extremo libre móvil (al 90% de la
+    // distancia desde la bisagra)
+    const float handleRatio = 0.90f;
+    handlePos.x = hingeBottom.x + (edgeBottom.x - hingeBottom.x) * handleRatio;
+    handlePos.y =
+        (hingeBottom.y + (edgeBottom.y - hingeBottom.y) * handleRatio) -
+        handleAltitude;
+  }
+
+  return handlePos;
+}
+
+void UpdateServantDoorInteraction(Game *game) {
+  Servant *s = &game->servant;
+  Room *r = &game->rooms[game->currentRoom];
+
+  if (!s->active)
+    return;
+
+  Vector2 servantCenter = {s->screenX, s->screenY};
+  const float triggerRadius = 18.0f;
+  const float triggerRadiusSq = triggerRadius * triggerRadius;
+
+  for (int i = 0; i < r->doorCount; i++) {
+    Door *d = &r->doors[i];
+
+    // Free exits without wooden leaves are ignored
+    if (d->state == DOOR_FREE_EXIT)
+      continue;
+
+    Vector2 handlePos = {0.0f, 0.0f};
+
+    if (d->wall == WALL_BACK) {
+      // Back door handle logic
+      Vector2 doorBase = ProjectRoomPoint(d->position, r->length, r->width);
+      doorBase.x += game->cameraScroll.x;
+      doorBase.y += game->cameraScroll.y;
+
+      if (d->state == DOOR_CLOSED || d->openProgress <= 0.0f) {
+        handlePos.x = doorBase.x + (d->width * 0.25f);
+        handlePos.y = doorBase.y - (d->height * 0.45f);
+      } else {
+        Vector2 hingeBottom = {doorBase.x - d->width / 2.0f, doorBase.y};
+        float leafLength = d->width * 0.90f;
+        float angle = d->openProgress * ((PI / 2.0f) * 0.88f);
+        float dx =
+            leafLength * cosf(angle) - (leafLength * 0.55f) * sinf(angle);
+        float dy = (leafLength * 0.38f) * sinf(angle);
+        Vector2 edgeBottom = {hingeBottom.x + dx, hingeBottom.y + dy};
+
+        handlePos.x = hingeBottom.x + (edgeBottom.x - hingeBottom.x) * 0.85f;
+        handlePos.y = (hingeBottom.y + (edgeBottom.y - hingeBottom.y) * 0.85f) -
+                      (d->height * 0.45f);
+      }
+    } else {
+      // Lateral doors (WALL_LEFT & WALL_RIGHT)
+      handlePos = GetSideDoorHandleScreenPos(d, r, game->cameraScroll);
+    }
+
+    // Distance check between servant and handle
+    float dx = servantCenter.x - handlePos.x;
+    float dy = servantCenter.y - handlePos.y;
+    float distSq = dx * dx + dy * dy;
+
+    if (distSq <= triggerRadiusSq) {
+      // Only toggle if the door is fully settled in its state
+      if (d->state == DOOR_CLOSED && d->openProgress <= 0.05f) {
+        d->state = DOOR_OPENING;
+      } else if (d->state == DOOR_OPEN && d->openProgress >= 0.95f) {
+        d->state = DOOR_CLOSING;
+      }
+    }
+  }
 }
