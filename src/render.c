@@ -98,11 +98,11 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
   Vector2 hingeBottom = {doorBase.x - door->width / 2.0f, doorBase.y};
   Vector2 hingeTop = {hingeBottom.x, hingeBottom.y - door->height};
 
-  float leafLength = door->width * 0.90f; // Value controls leaf length
+  float leafLength = door->width * 0.90f;      // Value controls leaf length
   const float MAX_ANGLE = (PI / 2.0f) * 0.88f; // Value controls leaf angle
   float angle = door->openProgress * MAX_ANGLE;
 
-  // Thsese numbers must also change to adjust when leaf length/angle is changed 
+  // Thsese numbers must also change to adjust when leaf length/angle is changed
   float dx = leafLength * cosf(angle) - (leafLength * 0.55f) * sinf(angle);
   float dy = (leafLength * 0.38f) * sinf(angle);
 
@@ -337,4 +337,30 @@ void DrawHUD(const Game *game) {
   DrawText(TextFormat("Room: %d | Doors: %d", game->currentRoom + 1,
                       room->doorCount),
            20, 48, 14, RAYWHITE);
+}
+
+void DrawServant(const Servant *s, float roomWidth, Vector2 scroll,
+                 const Game *game) {
+  (void)roomWidth;
+  (void)scroll;
+  (void)game;
+
+  if (!s->active)
+    return;
+
+  // Glowing energy pulse
+  float pulse = sinf((float)GetTime() * 14.0f);
+  Color coreColor =
+      (pulse > 0.0f) ? (Color){255, 105, 180, 255} : (Color){255, 20, 147, 255};
+
+  // Draw strictly at the current screen coordinates (no offsets, no
+  // reprojection)
+  Vector2 orbCenter = {s->screenX, s->screenY};
+  DrawCircleV(orbCenter, 4.5f, coreColor);
+  DrawCircleLines((int)orbCenter.x, (int)orbCenter.y, 6.5f,
+                  (Color){255, 192, 203, 190});
+
+  if (s->carriedItemId != 0) {
+    //DrawItemMiniIcon(s->carriedItemId, (Vector2){orbCenter.x, orbCenter.y - 10.0f}, game);
+  }
 }

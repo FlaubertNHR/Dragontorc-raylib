@@ -42,13 +42,13 @@ void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
     p->bounceForceX *= BOUNCE_FRICTION;
     p->bounceForceY *= BOUNCE_FRICTION;
   } else {
-    if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
+    if (IsKeyDown(KEY_RIGHT))
       moveX += 1.0f;
-    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
+    if (IsKeyDown(KEY_LEFT))
       moveX -= 1.0f;
-    if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W))
+    if (IsKeyDown(KEY_UP))
       moveY += 1.0f;
-    if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S))
+    if (IsKeyDown(KEY_DOWN))
       moveY -= 1.0f;
 
     if (moveX != 0.0f || moveY != 0.0f) {
@@ -382,4 +382,102 @@ void UpdateDoorAnimations(Room *room, float dt) {
       d->openProgress = 0.0f;
     }
   }
+}
+
+void UpdateServantPhysics(Game *game, float dt) {
+    Servant *s = &game->servant;
+    Room *r = &game->rooms[game->currentRoom];
+
+    if (!s->active) return;
+
+    float moveX = 0.0f;
+    float moveY = 0.0f;
+
+    // 1. Keyboard directional input
+    if (IsKeyDown(KEY_RIGHT)) moveX += 1.0f;
+    if (IsKeyDown(KEY_LEFT)) moveX -= 1.0f;
+    if (IsKeyDown(KEY_UP)) moveY -= 1.0f; // Pure screen UP (-Y)
+    if (IsKeyDown(KEY_DOWN)) moveY += 1.0f; // Pure screen DOWN (+Y)
+
+    if (moveX != 0.0f || moveY != 0.0f) {
+        float inputLength = sqrtf(moveX * moveX + moveY * moveY);
+        moveX /= inputLength;
+        moveY /= inputLength;
+
+        // 2. Direct rectilinear displacement in screen pixels
+        s->screenX += moveX * s->speed * dt;
+        s->screenY += moveY * s->speed * dt;
+
+        // 3. Absolute screen viewport padding (never leaves the display window)
+        const float screenPadding = 8.0f;
+        if (s->screenX < screenPadding) s->screenX = screenPadding;
+        if (s->screenX > (SCREEN_WIDTH - screenPadding)) s->screenX = SCREEN_WIDTH - screenPadding;
+        if (s->screenY < screenPadding) s->screenY = screenPadding;
+        if (s->screenY > (SCREEN_HEIGHT - screenPadding)) s->screenY = SCREEN_HEIGHT - screenPadding;
+
+        // 4. Vertical limits: front room floor threshold and top of the back wall
+        Vector2 frontFloorCenter = ProjectRoomPoint(r->width * 0.5f, 4.0f, r->width);
+        float maxScreenBottom = frontFloorCenter.y + game->cameraScroll.y;
+        if (s->screenY > maxScreenBottom) {
+            s->screenY = maxScreenBottom;
+        }
+
+        Vector2 backWallBase = ProjectRoomPoint(r->width * 0.5f, r->length, r->width);
+        float minScreenTop = (backWallBase.y - r->wallHeight) + game->cameraScroll.y;
+        if (s->screenY < minScreenTop) {
+            s->screenY = minScreenTop;
+        }
+
+        // =====================================================================
+        // 5. HORIZONTAL LIMITS: OUTERMOST VERTICAL WALL BOUNDARIES
+        // =====================================================================
+        // The outermost vertical edges of the room walls are given by the
+        // front floor corners (x = 0.0f and x = r->width at y = 0.0f).
+        Vector2 leftFrontCorner = ProjectRoomPoint(0.0f, 0.0f, r->width);
+        Vector2 rightFrontCorner = ProjectRoomPoint(r->width, 0.0f, r->width);
+
+        float outermostLeftX  = leftFrontCorner.x + game->cameraScroll.x;
+        float outermostRightX = rightFrontCorner.x + game->cameraScroll.x;
+
+        // Clamp the servant's screen position to these outermost vertical lines
+        if (s->screenX < outermostLeftX) {
+            s->screenX = outermostLeftX;
+        } else if (s->screenX > outermostRightX) {
+            s->screenX = outermostRightX;
+        }
+
+        // =====================================================================
+        // 6. DERIVE LOGICAL COORDINATES (s->x, s->y) FOR ITEM/DOOR INTERACTIONS
+        // =====================================================================
+        float localY = -(s->screenY - game->cameraScroll.y) / (0.45f * 1.3f);
+        if (localY < 4.0f) localY = 4.0f;
+        if (localY > r->length) localY = r->length;
+        s->y = localY;
+
+        // Calculate trapezoid horizontal bounds at current depth (s->y)
+        float factorY = s->y / FIXED_VISUAL_DEPTH;
+        if (factorY < 0.0f) factorY = 0.0f;
+        if (factorY > 1.0f) factorY = 1.0f;
+
+        float frontLeftX = -310.0f;
+        float backLeftX  = -130.0f;
+        float screenLeftLimit = (frontLeftX + (backLeftX - frontLeftX) * factorY) * 1.3f;
+
+        float frontRightX = r->width + 310.0f;
+        float backRightX  = r->width + 130.0f;
+        float screenRightLimit = (frontRightX + (backRightX - frontRightX) * factorY) * 1.3f;
+
+        float visibleRoomWidth = screenRightLimit - screenLeftLimit;
+        float localScreenX = s->screenX - game->cameraScroll.x;
+
+        if (visibleRoomWidth > 0.0f) {
+            float factorX = (localScreenX - screenLeftLimit) / visibleRoomWidth;
+            s->x = factorX * r->width;
+        }
+
+        // Clamp logical coordinates to valid floor ground so dropping an item
+        // always lands strictly inside the playable room scenario
+        if (s->x < 4.0f) s->x = 4.0f;
+        if (s->x > (r->width - 4.0f)) s->x = r->width - 4.0f;
+    }
 }
