@@ -17,6 +17,9 @@ static void InitPlayer(Player *p) {
   p->bounceForceX = 0.0f;
   p->bounceForceY = 0.0f;
   p->bounceLockoutTimer = 0.0f;
+
+  p->inventoryCount = 0;
+  p->pickupLockoutItemId = 0;
 }
 
 void InitGame(Game *game) {
@@ -84,6 +87,7 @@ void UpdateGame(Game *game) {
 
     UpdatePlayerPhysics(game, &moveX, &moveY, dt);
     UpdateCollisions(game, prevX, prevY, moveX, moveY);
+    UpdateItemPickups(game); // <--- RECOGIDA DE OBJETOS CON LA SOMBRA DE MAROC
   } else {
     // Maroc in meditative trance
     game->player.levitationTimer += dt * 4.0f;
@@ -107,6 +111,9 @@ void RenderGame(const Game *game) {
   DrawFloorGrid(room, game->cameraScroll);
   DrawWalls(room, game->cameraScroll);
   DrawDoorsBehind(room, player, game->cameraScroll);
+
+  DrawRoomItems(room, game->cameraScroll);
+
   DrawPlayer(game);
   DrawDoorsInFront(room, player, game->cameraScroll);
 

@@ -2,9 +2,6 @@
 #include <stddef.h>
 #include "config.h"
 
-#include "map_data.h"
-#include "config.h"
-
 int LoadMapData(Room rooms[], int maxRooms) {
     if (maxRooms < 3) return 0;
 
@@ -22,7 +19,13 @@ int LoadMapData(Room rooms[], int maxRooms) {
             { 11, WALL_RIGHT,  60.0f, 35.0f, 85.0f, MAROON, 1, 20, DOOR_OPEN, 1.0f },
             { 12, WALL_RIGHT, 160.0f, 35.0f, 85.0f, MAROON, 1, 21, DOOR_FREE_EXIT, 1.0f } 
         },
-        .doorCount = 3
+        .doorCount = 3,
+        .items = {
+            { 101, ITEM_TYPE_KEY,    "Iron Key",      100.0f,  80.0f, false, WALL_BACK,  0.0f, true, GOLD, 10 },
+            { 102, ITEM_TYPE_SCROLL, "Spell Scroll",  240.0f, 120.0f, false, WALL_BACK,  0.0f, true, SKYBLUE, 0 },
+            { 103, ITEM_TYPE_CROWN,  "Crown of Dumnonia", 180.0f, 150.0f, true, WALL_BACK, 65.0f, true, YELLOW, 0 } // Objeto en pared
+        },
+        .itemCount = 3        
     };
 
     // =========================================================================
@@ -39,7 +42,12 @@ int LoadMapData(Room rooms[], int maxRooms) {
             { 21, WALL_LEFT,  160.0f, 35.0f, 85.0f, MAROON, 0, 12, DOOR_OPEN, 1.0f  },
             { 22, WALL_RIGHT, 110.0f, 35.0f, 85.0f, RED,    2, 31, DOOR_OPEN, 1.0f }
         },
-        .doorCount = 3
+        .doorCount = 3,
+        .items = {
+            { 104, ITEM_TYPE_TREASURE, "Gold Chalice", 120.0f, 100.0f, false, WALL_BACK, 0.0f, true, ORANGE, 0 },
+            { 105, ITEM_TYPE_KEY,      "Silver Key",   180.0f, 140.0f, false, WALL_BACK, 0.0f, true, LIGHTGRAY, 22 }
+        },
+        .itemCount = 2        
     };
 
     // =========================================================================
@@ -55,7 +63,11 @@ int LoadMapData(Room rooms[], int maxRooms) {
             { 30, WALL_BACK, 280.0f, 60.0f, 85.0f, RED, 0, 10, DOOR_OPEN, 1.0f },
             { 31, WALL_BACK,  80.0f, 60.0f, 85.0f, RED, 1, 22, DOOR_OPEN, 1.0f }
         },
-        .doorCount = 2
+        .doorCount = 2,
+        .items = {
+            { 106, ITEM_TYPE_ARTIFACT, "Orb of Power", 280.0f, 110.0f, false, WALL_BACK, 0.0f, true, PURPLE, 0 }
+        },
+        .itemCount = 1        
     };
 
     return 3;

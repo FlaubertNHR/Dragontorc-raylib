@@ -359,12 +359,89 @@ void DrawPlayer(const Game *game) {
                 PLAYER_HEIGHT, WHITE);
 }
 
+// =============================================================================
+// RETRO ITEM SPRITE RENDERING (src/render.c)
+// =============================================================================
+static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
+                           float scale, Color color) {
+  switch (category) {
+  case ITEM_TYPE_KEY: {  // Retro key: bow + shank + bit
+    DrawCircleLines((int)centerPos.x - (int)(4.0f * scale), (int)centerPos.y,
+                    4.0f * scale, color);
+    DrawRectangle((int)centerPos.x, (int)centerPos.y - (int)(1.0f * scale),
+                  (int)(10.0f * scale), (int)(2.0f * scale), color);
+    DrawRectangle((int)centerPos.x + (int)(6.0f * scale), (int)centerPos.y,
+                  (int)(2.0f * scale), (int)(4.0f * scale), color);
+    DrawRectangle((int)centerPos.x + (int)(9.0f * scale), (int)centerPos.y,
+                  (int)(2.0f * scale), (int)(3.0f * scale), color);
+    break;
+  }
+  case ITEM_TYPE_SCROLL: {  // Rolled-up parchment
+    Rectangle scrollBody = {centerPos.x - 7.0f * scale,
+                            centerPos.y - 4.0f * scale, 14.0f * scale,
+                            8.0f * scale};
+    DrawRectangleRec(scrollBody, RAYWHITE);
+    DrawRectangleLinesEx(scrollBody, 1.5f * scale, DARKBROWN);
+ 
+    DrawRectangle((int)centerPos.x - (int)(1.5f * scale), // Central red ribbon
+                  (int)centerPos.y - (int)(4.0f * scale), (int)(3.0f * scale),
+                  (int)(8.0f * scale), RED);
+    break;
+  }
+  case ITEM_TYPE_CROWN: { // Royal crown with 3 points
+
+    Vector2 p1 = {centerPos.x - 8.0f * scale, centerPos.y + 4.0f * scale};
+    Vector2 p2 = {centerPos.x - 8.0f * scale, centerPos.y - 4.0f * scale};
+    Vector2 p3 = {centerPos.x - 4.0f * scale, centerPos.y};
+    Vector2 p4 = {centerPos.x, centerPos.y - 6.0f * scale};
+    Vector2 p5 = {centerPos.x + 4.0f * scale, centerPos.y};
+    Vector2 p6 = {centerPos.x + 8.0f * scale, centerPos.y - 4.0f * scale};
+    Vector2 p7 = {centerPos.x + 8.0f * scale, centerPos.y + 4.0f * scale};
+
+    DrawRectangle((int)p1.x, (int)centerPos.y, (int)(16.0f * scale),
+                  (int)(4.0f * scale), GOLD);
+    DrawTriangle(p1, p3, p2, GOLD);
+    DrawTriangle(p3, p5, p4, GOLD);
+    DrawTriangle(p5, p7, p6, GOLD);
+    break;
+  }
+  case ITEM_TYPE_TREASURE: { // Gem / Gleaming chalice
+
+    DrawPoly(centerPos, 4, 7.0f * scale, 45.0f, color);
+    DrawPolyLines(centerPos, 4, 7.0f * scale, 45.0f, WHITE);
+    break;
+  }
+  case ITEM_TYPE_ARTIFACT: {   // Artefacto mágico
+
+    DrawCircleV(centerPos, 6.0f * scale, color);
+    DrawCircleLines((int)centerPos.x, (int)centerPos.y, 8.0f * scale, RAYWHITE);
+    break;
+  }
+  }
+}
+
 void DrawHUD(const Game *game) {
-  const Room *room = &game->rooms[game->currentRoom];
-  DrawText(room->name, 20, 20, 20, YELLOW);
-  DrawText(TextFormat("Room: %d | Doors: %d", game->currentRoom + 1,
-                      room->doorCount),
-           20, 48, 14, RAYWHITE);
+    const Room *room = &game->rooms[game->currentRoom];
+    DrawText(room->name, 20, 20, 20, YELLOW);
+    DrawText(TextFormat("Room: %d | Doors: %d", game->currentRoom + 1, room->doorCount), 20, 48, 14, RAYWHITE);
+
+    // --- MAROC'S INVENTORY (3 SLOTS ON SCREEN) ---
+    int startX = SCREEN_WIDTH - 190;
+    int startY = SCREEN_HEIGHT - 45;
+
+    DrawText("INVENTORY", startX, startY - 16, 10, LIGHTGRAY);
+
+    for (int i = 0; i < MAX_INVENTORY_ITEMS; i++) {
+        Rectangle slotRect = { (float)(startX + i * 55), (float)startY, 50.0f, 35.0f };
+        DrawRectangleRec(slotRect, (Color){ 20, 20, 20, 200 });
+        DrawRectangleLinesEx(slotRect, 1.5f, (i == 0) ? GOLD : GRAY); // Casilla 0 resaltada (siguiente en salir)
+
+        if (i < game->player.inventoryCount) {
+            const Item *invItem = &game->player.inventory[i];
+            Vector2 iconCenter = { slotRect.x + 25.0f, slotRect.y + 17.0f };
+            DrawItemSprite(invItem->category, iconCenter, 1.1f, invItem->color);
+        }
+    }
 }
 
 void DrawServant(const Servant *s, float roomWidth, Vector2 scroll,
@@ -393,3 +470,39 @@ void DrawServant(const Servant *s, float roomWidth, Vector2 scroll,
     // - 10.0f}, game);
   }
 }
+
+void DrawRoomItems(const Room *room, Vector2 scroll) {
+    float time = (float)GetTime();
+
+    for (int i = 0; i < room->itemCount; i++) {
+        const Item *item = &room->items[i];
+        if (!item->active) continue;
+
+        if (!item->isWallItem) {
+           // --- OBJECT ON THE GROUND ---
+            Vector2 floorPos = ProjectRoomPoint(item->x, item->y, room->width);
+            floorPos.x += scroll.x;
+            floorPos.y += scroll.y;
+
+            // Shadow on the ground
+            DrawEllipse((int)floorPos.x, (int)floorPos.y, 8, 4, (Color){ 0, 0, 0, 100 });
+
+            // Gentle floating (bobbing)
+            float hoverOffset = sinf(time * 3.0f + item->id) * 3.0f;
+            Vector2 itemCenter = { floorPos.x, floorPos.y - 8.0f - hoverOffset };
+
+            DrawItemSprite(item->category, itemCenter, 1.0f, item->color);
+        } else {
+            // --- OBJECT ON THE WALL (Wall projection) ---
+            Vector2 wallBase = ProjectRoomPoint(item->x, item->y, room->width);
+            wallBase.x += scroll.x;
+            wallBase.y += scroll.y - item->wallHeightOffset;
+
+            DrawItemSprite(item->category, wallBase, 1.0f, item->color);
+            // Gleam on wall
+            DrawCircleLines((int)wallBase.x, (int)wallBase.y, 10.0f, (Color){ 255, 255, 255, 90 });
+        }
+    }
+}
+
+

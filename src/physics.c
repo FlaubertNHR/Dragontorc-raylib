@@ -627,3 +627,68 @@ void UpdateServantDoorInteraction(Game *game) {
     }
   }
 }
+
+// =============================================================================
+// MAROC ITEM PICKUP & INVENTORY FIFO SYSTEM (src/physics.c)
+// =============================================================================
+void UpdateItemPickups(Game *game) {
+  if (game->controlMode != CONTROL_MAROC)
+    return;
+
+  Player *p = &game->player;
+  Room *r = &game->rooms[game->currentRoom];
+
+  const float pickupRadius =
+      18.0f; // Logical pickup distance, with the shadow of Maroc
+  const float pickupRadiusSq = pickupRadius * pickupRadius;
+
+  bool standingOnLockoutItem = false;
+
+  for (int i = 0; i < r->itemCount; i++) {
+    Item *item = &r->items[i];
+
+    // Ignore inactive objects or objects hanging on the wall (these are
+    // collected by the servant)
+    if (!item->active || item->isWallItem)
+      continue;
+
+    float dx = p->x - item->x;
+    float dy = p->y - item->y;
+    float distSq = dx * dx + dy * dy;
+
+    if (distSq <= pickupRadiusSq) {
+      if (item->id == p->pickupLockoutItemId) {
+        standingOnLockoutItem = true;
+        continue;
+      }
+
+      if (p->inventoryCount < MAX_INVENTORY_ITEMS) {
+        // Add if there is space (<3)
+        p->inventory[p->inventoryCount] = *item;
+        p->inventoryCount++;
+        item->active = false; // Remove from the  room floor
+        p->pickupLockoutItemId = 0;
+      } else {
+        // INVENTORY FULL (3/3): FIFO SYSTEM (First In, First Out)
+        Item droppedItem = p->inventory[0];
+        droppedItem.x = item->x;
+        droppedItem.y = item->y;
+        droppedItem.isWallItem = false;
+        droppedItem.active = true;
+
+        p->inventory[0] = p->inventory[1];
+        p->inventory[1] = p->inventory[2];
+
+        p->inventory[2] = *item;
+
+        *item = droppedItem;
+
+        p->pickupLockoutItemId = droppedItem.id; 
+        standingOnLockoutItem = true;        
+      }
+    }
+  }
+  if (!standingOnLockoutItem) {
+     p->pickupLockoutItemId = 0; 
+  }  
+}
