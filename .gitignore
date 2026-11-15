@@ -6,7 +6,7 @@
 # Ignorar la carpeta completa de la biblioteca raylib
 raylib/
 lib/
-include/
+exclude/
 
 # Ignorar archivos ejecutables compilados y binarios
 *.exe
