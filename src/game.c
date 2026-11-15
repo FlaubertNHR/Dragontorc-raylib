@@ -29,6 +29,9 @@ void InitGame(Game *game) {
   game->cameraScroll = (Vector2){0.0f, 0.0f};
   game->projectedPlayer = (Vector2){0.0f, 0.0f};
 
+  // Texture loading
+  game->frameTexture = LoadTexture("resources/Frame.png");
+
   // Initialize servant entity & control mode
   game->controlMode = CONTROL_MAROC;
   game->servant.active = false;
@@ -36,16 +39,21 @@ void InitGame(Game *game) {
   game->servant.carriedItemId = 0;
 }
 
+void CloseGame(Game *game) {
+    if (game->frameTexture.id > 0) UnloadTexture(game->frameTexture); // Free texture
+}
+
 static void UpdateGameCamera(Game *game) {
   Room *r = &game->rooms[game->currentRoom];
   game->projectedPlayer =
       ProjectRoomPoint(game->player.x, game->player.y, r->width);
 
-  float screenCenterX = SCREEN_WIDTH / 2.0f;
-  float screenCenterY = 260.0f;
+  // Viewport
+  float viewportCenterX = VIEWPORT_X + (VIEWPORT_WIDTH / 2.0f);
+  float viewportCenterY = VIEWPORT_Y + (VIEWPORT_HEIGHT * 0.55f);
 
-  game->cameraScroll.x = screenCenterX - game->projectedPlayer.x;
-  game->cameraScroll.y = screenCenterY - game->projectedPlayer.y;
+  game->cameraScroll.x = viewportCenterX - game->projectedPlayer.x;
+  game->cameraScroll.y = viewportCenterY - game->projectedPlayer.y;
 }
 
 void UpdateGame(Game *game) {
@@ -108,17 +116,24 @@ void RenderGame(const Game *game) {
   BeginDrawing();
   ClearBackground(BLACK);
 
-  DrawFloorGrid(room, game->cameraScroll);
-  DrawWalls(room, game->cameraScroll);
-  DrawDoorsBehind(room, player, game->cameraScroll);
+  //  RENDERING OF THE PLAYABLE AREA WITH CLIPPING (Scissor Mode)
+  BeginScissorMode((int)VIEWPORT_X, (int)VIEWPORT_Y, (int)VIEWPORT_WIDTH,
+                   (int)VIEWPORT_HEIGHT);
+  {
+    DrawFloorGrid(room, game->cameraScroll);
+    DrawWalls(room, game->cameraScroll);
+    DrawDoorsBehind(room, player, game->cameraScroll);
 
-  DrawRoomItems(room, game->cameraScroll);
+    DrawRoomItems(room, game->cameraScroll);
 
-  DrawPlayer(game);
-  DrawDoorsInFront(room, player, game->cameraScroll);
+    DrawPlayer(game);
+    DrawDoorsInFront(room, player, game->cameraScroll);
 
-  DrawServant(&game->servant, room->width, game->cameraScroll, game);
+    DrawServant(&game->servant, room->width, game->cameraScroll, game);
+  }
+  EndScissorMode();
 
+  DrawDecorativeFrame(game);
   DrawHUD(game);
 
   EndDrawing();

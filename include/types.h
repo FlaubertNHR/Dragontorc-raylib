@@ -152,7 +152,8 @@ typedef struct {
     Vector2 projectedPlayer;
     Vector2 cameraScroll;
     
-    Texture2D itemTexture;    // Spritesheet atlas for item graphics    
+    Texture2D itemTexture;    // Spritesheet atlas for item graphics  
+    Texture2D frameTexture;    // Decorative frame texture PNG (1024x768)
 } Game;
 
 #endif // TYPES_H

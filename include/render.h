@@ -11,5 +11,6 @@ void DrawPlayer(const Game *game);
 void DrawServant(const Servant *s, float roomWidth, Vector2 scroll, const Game *game);
 void DrawHUD(const Game *game);
 void DrawRoomItems(const Room *room, Vector2 scroll);
+void DrawDecorativeFrame(const Game *game);
 
 #endif // RENDER_H

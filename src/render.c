@@ -1,6 +1,48 @@
 #include "render.h"
 #include "projection.h"
 #include <math.h>
+#include <stddef.h>
+
+// Draws the outer ornamental frame (sides and top section)
+void DrawDecorativeFrame(const Game *game) {
+  // RENDERING THE PNG FRAME TEXTURE, SCALED TO THE GAME'S RESOLUTION
+  if (game != NULL && game->frameTexture.id > 0) {
+    // Origin coordinates within the original image (1024x768)
+    Rectangle sourceRect = {0.0f, 0.0f, (float)game->frameTexture.width,
+                            (float)game->frameTexture.height};
+
+    // Destination rectangle on screen (adapted to SCREEN_WIDTH and
+    // SCREEN_HEIGHT)
+    Rectangle destRect = {0.0f, 0.0f, (float)SCREEN_WIDTH,
+                          (float)SCREEN_HEIGHT};
+    Vector2 origin = {0.0f, 0.0f};
+
+    DrawTexturePro(game->frameTexture, sourceRect, destRect, origin, 0.0f,
+                   WHITE);
+    return;
+  }
+  Color outerFrameColor = (Color){35, 30, 45, 255}; // Tono piedra oscura
+  Color bevelLightColor = (Color){70, 65, 85, 255}; // Bisel de brillo
+  Color bevelDarkColor = (Color){15, 12, 20, 255};  // Bisel de sombra
+
+  // 1. Top strip
+  DrawRectangle(0, 0, SCREEN_WIDTH, (int)FRAME_THICKNESS, outerFrameColor);
+  // 2. Left strip
+  DrawRectangle(0, (int)FRAME_THICKNESS, (int)FRAME_THICKNESS,
+                SCREEN_HEIGHT - (int)FRAME_THICKNESS, outerFrameColor);
+  // 3. Right strip
+  DrawRectangle(SCREEN_WIDTH - (int)FRAME_THICKNESS, (int)FRAME_THICKNESS,
+                (int)FRAME_THICKNESS, SCREEN_HEIGHT - (int)FRAME_THICKNESS,
+                outerFrameColor);
+
+  // --- RETRO DECORATIVE BEZELS AROUND THE VIEWPORT ---
+  DrawRectangleLinesEx((Rectangle){VIEWPORT_X - 2, VIEWPORT_Y - 2,
+                                   VIEWPORT_WIDTH + 4, VIEWPORT_HEIGHT + 4},
+                       2.0f, bevelDarkColor);
+  DrawRectangleLinesEx((Rectangle){VIEWPORT_X - 4, VIEWPORT_Y - 4,
+                                   VIEWPORT_WIDTH + 8, VIEWPORT_HEIGHT + 8},
+                       2.0f, bevelLightColor);
+}
 
 void DrawFloorGrid(const Room *room, Vector2 scroll) {
   for (float x = 0; x <= room->width; x += TILE_SIZE) {
@@ -106,7 +148,8 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
   const float MAX_ANGLE = (PI / 2.0f) * 0.88f; // Value controls leaf angle
   float angle = door->openProgress * MAX_ANGLE;
 
-  // Thsese numbers must also change to adjust when leaf length/angle is changed
+  // Thsese numbers must also change to adjust when leaf length/angle is
+  // changed
   float dx = leafLength * cosf(angle) - (leafLength * 0.55f) * sinf(angle);
   float dy = (leafLength * 0.38f) * sinf(angle);
 
@@ -365,7 +408,7 @@ void DrawPlayer(const Game *game) {
 static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
                            float scale, Color color) {
   switch (category) {
-  case ITEM_TYPE_KEY: {  // Retro key: bow + shank + bit
+  case ITEM_TYPE_KEY: { // Retro key: bow + shank + bit
     DrawCircleLines((int)centerPos.x - (int)(4.0f * scale), (int)centerPos.y,
                     4.0f * scale, color);
     DrawRectangle((int)centerPos.x, (int)centerPos.y - (int)(1.0f * scale),
@@ -376,13 +419,13 @@ static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
                   (int)(2.0f * scale), (int)(3.0f * scale), color);
     break;
   }
-  case ITEM_TYPE_SCROLL: {  // Rolled-up parchment
+  case ITEM_TYPE_SCROLL: { // Rolled-up parchment
     Rectangle scrollBody = {centerPos.x - 7.0f * scale,
                             centerPos.y - 4.0f * scale, 14.0f * scale,
                             8.0f * scale};
     DrawRectangleRec(scrollBody, RAYWHITE);
     DrawRectangleLinesEx(scrollBody, 1.5f * scale, DARKBROWN);
- 
+
     DrawRectangle((int)centerPos.x - (int)(1.5f * scale), // Central red ribbon
                   (int)centerPos.y - (int)(4.0f * scale), (int)(3.0f * scale),
                   (int)(8.0f * scale), RED);
@@ -411,7 +454,7 @@ static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
     DrawPolyLines(centerPos, 4, 7.0f * scale, 45.0f, WHITE);
     break;
   }
-  case ITEM_TYPE_ARTIFACT: {   // Artefacto mágico
+  case ITEM_TYPE_ARTIFACT: { // Magic artifact
 
     DrawCircleV(centerPos, 6.0f * scale, color);
     DrawCircleLines((int)centerPos.x, (int)centerPos.y, 8.0f * scale, RAYWHITE);
@@ -421,27 +464,49 @@ static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
 }
 
 void DrawHUD(const Game *game) {
-    const Room *room = &game->rooms[game->currentRoom];
-    DrawText(room->name, 20, 20, 20, YELLOW);
-    DrawText(TextFormat("Room: %d | Doors: %d", game->currentRoom + 1, room->doorCount), 20, 48, 14, RAYWHITE);
+  const Room *room = &game->rooms[game->currentRoom];
 
-    // --- MAROC'S INVENTORY (3 SLOTS ON SCREEN) ---
-    int startX = SCREEN_WIDTH - 190;
-    int startY = SCREEN_HEIGHT - 45;
+  float hudX = FRAME_THICKNESS;
+  float hudY = SCREEN_HEIGHT - HUD_HEIGHT;
+  float hudWidth = VIEWPORT_WIDTH;
 
-    DrawText("INVENTORY", startX, startY - 16, 10, LIGHTGRAY);
+  // HUD background with a retro aesthetic
+  DrawRectangle((int)hudX, (int)hudY, (int)hudWidth, (int)HUD_HEIGHT,
+                (Color){15, 15, 22, 255});
+  DrawRectangleLinesEx((Rectangle){hudX, hudY, hudWidth, HUD_HEIGHT}, 3.0f,
+                       GOLD);
 
-    for (int i = 0; i < MAX_INVENTORY_ITEMS; i++) {
-        Rectangle slotRect = { (float)(startX + i * 55), (float)startY, 50.0f, 35.0f };
-        DrawRectangleRec(slotRect, (Color){ 20, 20, 20, 200 });
-        DrawRectangleLinesEx(slotRect, 1.5f, (i == 0) ? GOLD : GRAY); // Casilla 0 resaltada (siguiente en salir)
+  // 1. Room Information (Top-left corner of the HUD)
+  DrawText(room->name, (int)hudX + 20, (int)hudY + 15, 20, YELLOW);
+  DrawText(TextFormat("ROOM: %d / %d", game->currentRoom + 1, game->roomCount),
+           (int)hudX + 20, (int)hudY + 42, 14, RAYWHITE);
 
-        if (i < game->player.inventoryCount) {
-            const Item *invItem = &game->player.inventory[i];
-            Vector2 iconCenter = { slotRect.x + 25.0f, slotRect.y + 17.0f };
-            DrawItemSprite(invItem->category, iconCenter, 1.1f, invItem->color);
-        }
+  // 2. Maroc’s Inventory (3 slots in the center of the HUD)
+  int invStartX = (int)hudX + (int)(hudWidth * 0.45f);
+  int invStartY = (int)hudY + 25;
+  DrawText("INVENTORY", invStartX, invStartY - 16, 12, LIGHTGRAY);
+
+  for (int i = 0; i < MAX_INVENTORY_ITEMS; i++) {
+    Rectangle slotRect = {(float)(invStartX + i * 65), (float)invStartY, 55.0f,
+                          45.0f};
+    DrawRectangleRec(slotRect, (Color){30, 30, 40, 255});
+    DrawRectangleLinesEx(slotRect, 2.0f, (i == 0) ? GOLD : GRAY);
+
+    if (i < game->player.inventoryCount) {
+      const Item *invItem = &game->player.inventory[i];
+      Vector2 iconCenter = {slotRect.x + 27.0f, slotRect.y + 22.0f};
+      DrawItemSprite(invItem->category, iconCenter, 1.1f, invItem->color);
     }
+  }
+
+  // 3. Servant Status (Right corner of the HUD)
+  int servantX = (int)hudX + (int)(hudWidth * 0.80f);
+  DrawText("MODE", servantX, invStartY - 16, 12, LIGHTGRAY);
+  if (game->controlMode == CONTROL_MAROC) {
+    DrawText("MAROC", servantX, invStartY + 10, 16, GREEN);
+  } else {
+    DrawText("SERVANT", servantX, invStartY + 10, 16, SKYBLUE);
+  }
 }
 
 void DrawServant(const Servant *s, float roomWidth, Vector2 scroll,
@@ -472,37 +537,38 @@ void DrawServant(const Servant *s, float roomWidth, Vector2 scroll,
 }
 
 void DrawRoomItems(const Room *room, Vector2 scroll) {
-    float time = (float)GetTime();
+  float time = (float)GetTime();
 
-    for (int i = 0; i < room->itemCount; i++) {
-        const Item *item = &room->items[i];
-        if (!item->active) continue;
+  for (int i = 0; i < room->itemCount; i++) {
+    const Item *item = &room->items[i];
+    if (!item->active)
+      continue;
 
-        if (!item->isWallItem) {
-           // --- OBJECT ON THE GROUND ---
-            Vector2 floorPos = ProjectRoomPoint(item->x, item->y, room->width);
-            floorPos.x += scroll.x;
-            floorPos.y += scroll.y;
+    if (!item->isWallItem) {
+      // --- OBJECT ON THE GROUND ---
+      Vector2 floorPos = ProjectRoomPoint(item->x, item->y, room->width);
+      floorPos.x += scroll.x;
+      floorPos.y += scroll.y;
 
-            // Shadow on the ground
-            DrawEllipse((int)floorPos.x, (int)floorPos.y, 8, 4, (Color){ 0, 0, 0, 100 });
+      // Shadow on the ground
+      DrawEllipse((int)floorPos.x, (int)floorPos.y, 8, 4,
+                  (Color){0, 0, 0, 100});
 
-            // Gentle floating (bobbing)
-            float hoverOffset = sinf(time * 3.0f + item->id) * 3.0f;
-            Vector2 itemCenter = { floorPos.x, floorPos.y - 8.0f - hoverOffset };
+      // Gentle floating (bobbing)
+      float hoverOffset = sinf(time * 3.0f + item->id) * 3.0f;
+      Vector2 itemCenter = {floorPos.x, floorPos.y - 8.0f - hoverOffset};
 
-            DrawItemSprite(item->category, itemCenter, 1.0f, item->color);
-        } else {
-            // --- OBJECT ON THE WALL (Wall projection) ---
-            Vector2 wallBase = ProjectRoomPoint(item->x, item->y, room->width);
-            wallBase.x += scroll.x;
-            wallBase.y += scroll.y - item->wallHeightOffset;
+      DrawItemSprite(item->category, itemCenter, 1.0f, item->color);
+    } else {
+      // --- OBJECT ON THE WALL (Wall projection) ---
+      Vector2 wallBase = ProjectRoomPoint(item->x, item->y, room->width);
+      wallBase.x += scroll.x;
+      wallBase.y += scroll.y - item->wallHeightOffset;
 
-            DrawItemSprite(item->category, wallBase, 1.0f, item->color);
-            // Gleam on wall
-            DrawCircleLines((int)wallBase.x, (int)wallBase.y, 10.0f, (Color){ 255, 255, 255, 90 });
-        }
+      DrawItemSprite(item->category, wallBase, 1.0f, item->color);
+      // Gleam on wall
+      DrawCircleLines((int)wallBase.x, (int)wallBase.y, 10.0f,
+                      (Color){255, 255, 255, 90});
     }
+  }
 }
-
-

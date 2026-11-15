@@ -7,6 +7,16 @@
 #define TARGET_FPS                 60
 #define WINDOW_TITLE               "Dragontorc Remake"
 
+
+#define FRAME_THICKNESS (SCREEN_WIDTH / 16.0f) // Decorative outer frame (1/16 of the total width)
+#define HUD_HEIGHT (SCREEN_HEIGHT * 0.30f) // // HUD height (30% of the total height)
+
+// Dimensions of the window/usable play area (Viewport)
+#define VIEWPORT_X                 FRAME_THICKNESS
+#define VIEWPORT_Y                 FRAME_THICKNESS
+#define VIEWPORT_WIDTH             (SCREEN_WIDTH - (FRAME_THICKNESS * 2.0f))
+#define VIEWPORT_HEIGHT            (SCREEN_HEIGHT - FRAME_THICKNESS - HUD_HEIGHT)
+
 // Room rendering and perspective settings
 #define TILE_SIZE                  64.0f
 #define FIXED_VISUAL_DEPTH         350.0f
