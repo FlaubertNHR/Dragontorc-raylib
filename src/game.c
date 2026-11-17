@@ -6,8 +6,8 @@
 #include "render.h"
 
 static void InitPlayer(Player *p) {
-  p->x = 180.0f;
-  p->y = 40.0f;
+  p->x = INITIAL_PLAYER_X;
+  p->y = INITIAL_PLAYER_Y;
   p->z = PLAYER_BASE_Z;
   p->speed = PLAYER_BASE_SPEED;
 
@@ -35,7 +35,7 @@ void InitGame(Game *game) {
   // Initialize servant entity & control mode
   game->controlMode = CONTROL_MAROC;
   game->servant.active = false;
-  game->servant.speed = 260.0f;
+  game->servant.speed = SERVANT_BASE_SPEED;
   game->servant.carriedItemId = 0;
 }
 
@@ -50,7 +50,7 @@ static void UpdateGameCamera(Game *game) {
 
   // Viewport
   float viewportCenterX = VIEWPORT_X + (VIEWPORT_WIDTH / 2.0f);
-  float viewportCenterY = VIEWPORT_Y + (VIEWPORT_HEIGHT * 0.55f);
+  float viewportCenterY = VIEWPORT_Y + (VIEWPORT_HEIGHT * CAMERA_VIEWPORT_CENTER_Y_RATIO);
 
   game->cameraScroll.x = viewportCenterX - game->projectedPlayer.x;
   game->cameraScroll.y = viewportCenterY - game->projectedPlayer.y;
@@ -66,7 +66,7 @@ void UpdateGame(Game *game) {
       game->servant.active = true;
       game->servant.x = game->player.x;
       game->servant.y = game->player.y;
-      game->servant.speed = 260.0f;
+      game->servant.speed = SERVANT_BASE_SPEED;
 
       // Compute exact screen position of Maroc's head
       // game->projectedPlayer + game->cameraScroll is the center of Maroc's
@@ -75,11 +75,10 @@ void UpdateGame(Game *game) {
       float shadowScreenY = game->projectedPlayer.y + game->cameraScroll.y;
 
       float currentAltitude = game->player.z + game->player.floatingOffset;
-      const float headOffset = 30.0f; // Floating above head
 
       game->servant.screenX = shadowScreenX;
       game->servant.screenY =
-          shadowScreenY - PLAYER_HEIGHT - currentAltitude - headOffset;
+          shadowScreenY - PLAYER_HEIGHT - currentAltitude - SERVANT_HEAD_OFFSET;
     } else {
       game->controlMode = CONTROL_MAROC;
       game->servant.active = false;
@@ -98,8 +97,8 @@ void UpdateGame(Game *game) {
     UpdateItemPickups(game); // <--- RECOGIDA DE OBJETOS CON LA SOMBRA DE MAROC
   } else {
     // Maroc in meditative trance
-    game->player.levitationTimer += dt * 4.0f;
-    game->player.floatingOffset = sinf(game->player.levitationTimer) * 3.5f;
+    game->player.levitationTimer += dt * LEVITATION_SPEED;
+    game->player.floatingOffset = sinf(game->player.levitationTimer) * LEVITATION_AMPLITUDE;
 
     // Servant takes exclusive movement
     UpdateServantPhysics(game, dt);
@@ -133,8 +132,7 @@ void RenderGame(const Game *game) {
   }
   EndScissorMode();
 
-  DrawDecorativeFrame(game);
   DrawHUD(game);
-
+  DrawDecorativeFrame(game);
   EndDrawing();
 }

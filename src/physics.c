@@ -18,8 +18,8 @@ void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
   float moveY = 0.0f;
 
   // Levitation smooth floating oscillation (bobbing)
-  p->levitationTimer += dt * 4.0f;
-  p->floatingOffset = sinf(p->levitationTimer) * 3.5f;
+  p->levitationTimer += dt * LEVITATION_SPEED;
+  p->floatingOffset = sinf(p->levitationTimer) * LEVITATION_AMPLITUDE;
 
   // Visual unit ratio to ensure identical screen movement speed across all room
   // sizes
@@ -84,16 +84,16 @@ void TransitionToRoom(Game *game, const Door *crossedDoor) {
     Door *dest = &nextRoom->doors[i];
     if (dest->id == targetDoorId) {
       if (dest->wall == WALL_LEFT) {
-        game->player.x = 8.0f; // A step inward
+        game->player.x = DOOR_TRANSITION_STEP_X; // A step inward
         game->player.y = dest->position;
       } else if (dest->wall == WALL_RIGHT) {
-        game->player.x = nextRoom->width - 8.0f; // A step inward
+        game->player.x = nextRoom->width - DOOR_TRANSITION_STEP_X; // A step inward
         game->player.y = dest->position;
       } else if (dest->wall == WALL_BACK) {
         game->player.x = dest->position;
         // We shift the position toward the front of the room so that it does
         // not end up buried beneath the lintel or inside the black frame
-        game->player.y = nextRoom->length - 30.0f;
+        game->player.y = nextRoom->length - DOOR_TRANSITION_BACK_MARGIN_Y;
       }
       break;
     }
@@ -111,7 +111,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   Door crossedDoor;
 
   // --- 1. LEFT WALL COLLISION ---
-  if (p->x < 8.0f) {
+  if (p->x < SIDE_WALL_DETECTION_MARGIN) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
@@ -126,7 +126,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
             insideDoorway = false;
           } else {
             insideDoorway = true;
-            if (p->x < -3.0f) {
+            if (p->x < -DOOR_TRIGGER_THRESHOLD_SIDE) {
               crossedDoor = *d;
               hasChangedRoom = true;
             }
@@ -140,7 +140,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   }
 
   // --- 2. RIGHT WALL COLLISION ---
-  if (p->x > (r->width - 8.0f) && !hasChangedRoom) {
+  if (p->x > (r->width - SIDE_WALL_DETECTION_MARGIN) && !hasChangedRoom) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
@@ -155,7 +155,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
             insideDoorway = false;
           } else {
             insideDoorway = true;
-            if (p->x > (r->width + 3.0f)) {
+            if (p->x > (r->width + DOOR_TRIGGER_THRESHOLD_SIDE)) {
               crossedDoor = *d;
               hasChangedRoom = true;
             }
@@ -184,7 +184,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
             insideDoorway = false;
           } else {
             insideDoorway = true;
-            if (p->y > (r->length + 8.0f)) {
+            if (p->y > (r->length + DOOR_TRIGGER_THRESHOLD_BACK)) {
               crossedDoor = *d;
               hasChangedRoom = true;
             }
@@ -339,18 +339,30 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
     }
   }
 
-  // --- 6. FRONT ROOM BOUNDARY COLLISION ---
+  // --- 8. FRONT ROOM BOUNDARY COLLISION ---
   if (p->y < 0.0f) {
     p->y = prevY;
   }
 
-  // --- 7. FAN PERSPECTIVE COMPLIANCE (ONLY ON NET VERTICAL DISPLACEMENT) ---
-  if (moveY != 0.0f && p->y != prevY) {
+  // --- 9. FAN PERSPECTIVE COMPLIANCE (ONLY ON NET VERTICAL DISPLACEMENT) ---
+if (moveY != 0.0f && p->y != prevY) {
     float stepY = (p->y - prevY);
     float roomCenter = r->width / 2.0f;
-    float deviation = p->x - roomCenter;
-    p->x += (deviation * (0.45f / FIXED_VISUAL_DEPTH)) * stepY;
-  }
+    float deviation  = p->x - roomCenter;
+
+    // 1. Width of the projected floor area at the front and at the rear  
+    float frontSpan = r->width - (2 * PROJECTION_LEFT_FRONT_X); 
+    float backSpan  = r->width - (2 * PROJECTION_LEFT_BACK_X);  
+    float spanDiff  = frontSpan - backSpan; 
+
+    // 2. Exact width of the ground at the player's current Y coordinate    
+    float currentSpanY = frontSpan - spanDiff * (p->y / FIXED_VISUAL_DEPTH);
+
+    // 3. Exact dynamic compensation   
+    if (currentSpanY > 0.0f) {
+        p->x += (spanDiff / FIXED_VISUAL_DEPTH) * (deviation / currentSpanY) * stepY;
+    }
+}
 
   // --- 8. TRIGGER ROOM SWITCH ---
   if (hasChangedRoom) {
@@ -461,7 +473,7 @@ void UpdateServantPhysics(Game *game, float dt) {
     // =====================================================================
     // 6. DERIVE LOGICAL COORDINATES (s->x, s->y) FOR ITEM/DOOR INTERACTIONS
     // =====================================================================
-    float localY = -(s->screenY - game->cameraScroll.y) / (0.45f * 1.3f);
+    float localY = -(s->screenY - game->cameraScroll.y) / (PROJECTION_Y_FACTOR * 1.3f);
     if (localY < 4.0f)
       localY = 4.0f;
     if (localY > r->length)
@@ -475,13 +487,13 @@ void UpdateServantPhysics(Game *game, float dt) {
     if (factorY > 1.0f)
       factorY = 1.0f;
 
-    float frontLeftX = -310.0f;
-    float backLeftX = -130.0f;
+    float frontLeftX = PROJECTION_LEFT_FRONT_X;
+    float backLeftX = PROJECTION_LEFT_BACK_X;
     float screenLeftLimit =
         (frontLeftX + (backLeftX - frontLeftX) * factorY) * 1.3f;
 
-    float frontRightX = r->width + 310.0f;
-    float backRightX = r->width + 130.0f;
+    float frontRightX = r->width - PROJECTION_LEFT_FRONT_X;
+    float backRightX = r->width - PROJECTION_LEFT_BACK_X;
     float screenRightLimit =
         (frontRightX + (backRightX - frontRightX) * factorY) * 1.3f;
 

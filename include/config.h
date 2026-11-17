@@ -17,13 +17,27 @@
 #define VIEWPORT_WIDTH             (SCREEN_WIDTH - (FRAME_THICKNESS * 2.0f))
 #define VIEWPORT_HEIGHT            (SCREEN_HEIGHT - FRAME_THICKNESS - HUD_HEIGHT)
 
+
 // Room rendering and perspective settings
 #define TILE_SIZE                  64.0f
 #define FIXED_VISUAL_DEPTH         350.0f
 
-// Player movement and physics
+// Inclination of the side walls (2.5D trapezoidal perspective)
+#define PROJECTION_LEFT_FRONT_X    -575.0f // Angle= arctan((PROJECTION_LEFT_BACK_X - PROJECTION_LEFT_FRONT_X)/varY)
+#define PROJECTION_LEFT_BACK_X     -200.0f  // where  VarY= FIXED_VISUAL_DEPTH * PROJECTION_Y_FACTOR
+#define PROJECTION_Y_FACTOR        0.54f  // Perspective compressión factor; i.e. from how high you look at the floor 
+                                          // 0: no floor seen; 1: cenital view
+#define PROJECTION_SCALE           1.3f
+#define PROJECTION_MIN_FACTOR_Y    0.0f
+
+// Camera tuning
+#define CAMERA_VIEWPORT_CENTER_Y_RATIO 0.81f
+
+// Player position, movement and physics
+#define INITIAL_PLAYER_X           180.0f
+#define INITIAL_PLAYER_Y           40.0f
 #define PLAYER_BASE_SPEED          280.0f
-#define SPEED_MULTIPLIER_X         1.35f
+#define SPEED_MULTIPLIER_X         1.0f
 #define DIAGONAL_FACTOR_X          0.55f
 
 // Bounce mechanics and collision damping
@@ -35,15 +49,31 @@
 #define PLAYER_BASE_Z              24.0f
 #define PLAYER_WIDTH               20.0f
 #define PLAYER_HEIGHT              35.0f
-#define SHADOW_RADIUS_X            16.0f
-#define SHADOW_RADIUS_Y            8.0f
+#define LEVITATION_SPEED           4.0f // Bobbing frequency
+#define LEVITATION_AMPLITUDE       3.5f // Bobbing amplitude
+
+#define SHADOW_RADIUS_X            36.0f //16.0f
+#define SHADOW_RADIUS_Y            6.0f //8.0f
 
 #define SHADOW_LOGIC_RADIUS_Y      (SHADOW_RADIUS_Y / 1.55f)
 #define SHADOW_LOGIC_RADIUS_X      (SHADOW_RADIUS_X * 0.75f)
 
+// Servant/Spirit parameters
+#define SERVANT_BASE_SPEED         260.0f
+#define SERVANT_HEAD_OFFSET        30.0f
+
 // World capacity limits
 #define MAX_DOORS_PER_ROOM         6
 #define MAX_ROOMS                  3
+
+// Door transitions and collision thresholds
+#define DOOR_TRANSITION_STEP_X         8.0f
+#define DOOR_TRANSITION_BACK_MARGIN_Y  30.0f
+#define DOOR_TRIGGER_THRESHOLD_SIDE    3.0f
+#define DOOR_TRIGGER_THRESHOLD_BACK    8.0f
+#define SIDE_WALL_DETECTION_MARGIN     0.0f
+
+#define WALL_BOUNCE_IMPULSE_FORCE 50.0f
 
 // Items characteristics
 #define MAX_ITEMS_PER_ROOM   8
