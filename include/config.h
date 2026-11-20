@@ -56,7 +56,7 @@
 #define SHADOW_LOGIC_RADIUS_X      (SHADOW_RADIUS_X * 0.75f)
 
 #define LEVITATION_SPEED           4.0f // Bobbing frequency
-#define LEVITATION_AMPLITUDE       3.5f // Bobbing amplitude
+#define LEVITATION_AMPLITUDE       3.5f
 
 // Servant parameters
 #define SERVANT_BASE_SPEED         260.0f

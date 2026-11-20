@@ -11,8 +11,7 @@ void DrawDecorativeFrame(const Game *game) {
     Rectangle sourceRect = {0.0f, 0.0f, (float)game->frameTexture.width,
                             (float)game->frameTexture.height};
 
-    // Destination rectangle on screen (adapted to SCREEN_WIDTH and
-    // SCREEN_HEIGHT)
+    // Destination rectangle on screen (adapted to SCREEN_WIDTH and SCREEN_HEIGHT)
     Rectangle destRect = {0.0f, 0.0f, (float)SCREEN_WIDTH,
                           (float)SCREEN_HEIGHT};
     Vector2 origin = {0.0f, 0.0f};
@@ -21,9 +20,9 @@ void DrawDecorativeFrame(const Game *game) {
                    WHITE);
     return;
   }
-  Color outerFrameColor = (Color){35, 30, 45, 255}; // Tono piedra oscura
-  Color bevelLightColor = (Color){70, 65, 85, 255}; // Bisel de brillo
-  Color bevelDarkColor = (Color){15, 12, 20, 255};  // Bisel de sombra
+  Color outerFrameColor = (Color){35, 30, 45, 255}; // Dark stone tone
+  Color bevelLightColor = (Color){70, 65, 85, 255}; // Glossy bevel
+  Color bevelDarkColor = (Color){15, 12, 20, 255};  // Shadow bevel
 
   // 1. Top strip
   DrawRectangle(0, 0, SCREEN_WIDTH, (int)FRAME_THICKNESS, outerFrameColor);
@@ -35,7 +34,7 @@ void DrawDecorativeFrame(const Game *game) {
                 (int)FRAME_THICKNESS, SCREEN_HEIGHT - (int)FRAME_THICKNESS,
                 outerFrameColor);
 
-  // --- RETRO DECORATIVE BEZELS AROUND THE VIEWPORT ---
+  // --- RETRO DECORATIVE BEvELS AROUND THE VIEWPORT ---
   DrawRectangleLinesEx((Rectangle){VIEWPORT_X - 2, VIEWPORT_Y - 2,
                                    VIEWPORT_WIDTH + 4, VIEWPORT_HEIGHT + 4},
                        2.0f, bevelDarkColor);
@@ -45,26 +44,42 @@ void DrawDecorativeFrame(const Game *game) {
 }
 
 void DrawFloorGrid(const Room *room, Vector2 scroll) {
+  float leftFrontX = GetLeftWallX(0.0f, room->width);
+  float leftBackX = GetLeftWallX(room->length, room->width);
+  float rightFrontX = GetRightWallX(0.0f, room->width);
+  float rightBackX = GetRightWallX(room->length, room->width);
+
   for (float x = 0; x <= room->width; x += TILE_SIZE) {
-    Vector2 p1 = ProjectRoomPoint(x, 0.0f, room->width);
-    Vector2 p2 = ProjectRoomPoint(x, room->length, room->width);
+    float t = (room->width > 0.0f) ? (x / room->width) : 0.0f;
+    float xFront = leftFrontX + t * (rightFrontX - leftFrontX);
+    float xBack = leftBackX + t * (rightBackX - leftBackX);
+
+    Vector2 p1 = ProjectRoomPoint(xFront, 0.0f, room->width);
+    Vector2 p2 = ProjectRoomPoint(xBack, room->length, room->width);
     DrawLine(p1.x + scroll.x, p1.y + scroll.y, p2.x + scroll.x, p2.y + scroll.y,
              DARKGRAY);
   }
 
   for (float y = 0; y <= room->length; y += TILE_SIZE) {
-    Vector2 p1 = ProjectRoomPoint(0.0f, y, room->width);
-    Vector2 p2 = ProjectRoomPoint(room->width, y, room->width);
+    float xLeft = GetLeftWallX(y, room->width);
+    float xRight = GetRightWallX(y, room->width);
+    Vector2 p1 = ProjectRoomPoint(xLeft, y, room->width);
+    Vector2 p2 = ProjectRoomPoint(xRight, y, room->width);
     DrawLine(p1.x + scroll.x, p1.y + scroll.y, p2.x + scroll.x, p2.y + scroll.y,
              DARKGRAY);
   }
 }
 
 void DrawWalls(const Room *room, Vector2 scroll) {
-  Vector2 leftBottom = ProjectRoomPoint(0.0f, 0.0f, room->width);
-  Vector2 leftTop = ProjectRoomPoint(0.0f, room->length, room->width);
-  Vector2 rightTop = ProjectRoomPoint(room->width, room->length, room->width);
-  Vector2 rightBottom = ProjectRoomPoint(room->width, 0.0f, room->width);
+  float leftFrontX = GetLeftWallX(0.0f, room->width);
+  float leftBackX = GetLeftWallX(room->length, room->width);
+  float rightFrontX = GetRightWallX(0.0f, room->width);
+  float rightBackX = GetRightWallX(room->length, room->width);
+
+  Vector2 leftBottom = ProjectRoomPoint(leftFrontX, 0.0f, room->width);
+  Vector2 leftTop = ProjectRoomPoint(leftBackX, room->length, room->width);
+  Vector2 rightTop = ProjectRoomPoint(rightBackX, room->length, room->width);
+  Vector2 rightBottom = ProjectRoomPoint(rightFrontX, 0.0f, room->width);
 
   leftBottom.x += scroll.x;
   leftBottom.y += scroll.y;
@@ -124,7 +139,7 @@ static void DrawBackDoorHole(const Door *door, const Room *room,
   if (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) {
     DrawText("X", doorBase.x - 5, doorBase.y - door->height / 2.0f - 5, 12,
              RED);
-    Vector2 knobPos = {doorBase.x + (door->width * 0.25f), // Knob
+    Vector2 knobPos = {doorBase.x + (door->width * 0.25f),
                        doorBase.y - (door->height * 0.45f)};
     DrawCircleV(knobPos, 3.0f, GOLD);
     DrawCircleLines((int)knobPos.x, (int)knobPos.y, 3.5f, DARKBROWN);
@@ -144,19 +159,19 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
   Vector2 hingeBottom = {doorBase.x - door->width / 2.0f, doorBase.y};
   Vector2 hingeTop = {hingeBottom.x, hingeBottom.y - door->height};
 
-  float leafLength = door->width * 0.90f;      // Value controls leaf length
-  const float MAX_ANGLE = (PI / 2.0f) * 0.88f; // Value controls leaf angle
+  float leafLength = door->width * 0.90f;
+  const float MAX_ANGLE = (PI / 2.0f) * 0.88f;
   float angle = door->openProgress * MAX_ANGLE;
 
-  // Thsese numbers must also change to adjust when leaf length/angle is
-  // changed
   float dx = leafLength * cosf(angle) - (leafLength * 0.55f) * sinf(angle);
   float dy = (leafLength * 0.38f) * sinf(angle);
 
   Vector2 edgeBottom = {hingeBottom.x + dx, hingeBottom.y + dy};
   Vector2 edgeTop = {edgeBottom.x, edgeBottom.y - door->height};
 
-  Color doorLeafColor = {25, 25, 25, 255};
+  // Fill open back door leaf with solid door theme color
+  Color doorLeafColor = door->color;
+
   DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
   DrawTriangle(hingeTop, edgeTop, edgeBottom, doorLeafColor);
 
@@ -164,7 +179,7 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
   DrawLineEx(edgeBottom, edgeTop, 2.5f, door->color);
   DrawLineEx(edgeTop, hingeTop, 2.5f, door->color);
 
-  const float handleRatio = 0.85f; // Knob
+  const float handleRatio = 0.85f;
   Vector2 knobPos = {
       hingeBottom.x + (edgeBottom.x - hingeBottom.x) * handleRatio,
       (hingeBottom.y + (edgeBottom.y - hingeBottom.y) * handleRatio) -
@@ -176,10 +191,11 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
 static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
   float yFront = door->position - (door->width / 2.0f);
   float yBack = door->position + (door->width / 2.0f);
-  float xWall = (door->wall == WALL_LEFT) ? 1.0f : (room->width - 1.0f);
+  float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width) : GetRightWallX(yFront, room->width);
+  float xWallBack  = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width)  : GetRightWallX(yBack, room->width);
 
-  Vector2 baseFront = ProjectRoomPoint(xWall, yFront, room->width);
-  Vector2 baseBack = ProjectRoomPoint(xWall, yBack, room->width);
+  Vector2 baseFront = ProjectRoomPoint(xWallFront, yFront, room->width);
+  Vector2 baseBack = ProjectRoomPoint(xWallBack, yBack, room->width);
   baseFront.x += scroll.x;
   baseFront.y += scroll.y;
   baseBack.x += scroll.x;
@@ -190,13 +206,10 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
 
   if (door->state == DOOR_FREE_EXIT) {
     DrawTriangle(baseFront, baseBack, roofFront, BLACK);
-    DrawTriangle(roofFront, baseBack,
-                 (Vector2){baseBack.x, baseBack.y - door->height}, BLACK);
+    DrawTriangle(roofFront, baseBack, roofBack, BLACK);
     DrawLineEx(baseFront, roofFront, 2.0f, door->color);
-    DrawLineEx(roofFront, (Vector2){baseBack.x, baseBack.y - door->height},
-               2.0f, door->color);
-    DrawLineEx((Vector2){baseBack.x, baseBack.y - door->height}, baseBack, 2.0f,
-               door->color);
+    DrawLineEx(roofFront, roofBack, 2.0f, door->color);
+    DrawLineEx(roofBack, baseBack, 2.0f, door->color);
     return;
   }
 
@@ -204,41 +217,31 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
                         ? DARKGRAY
                         : BLACK;
 
-  if (door->wall == WALL_LEFT) {
-    DrawTriangle(baseFront, baseBack, roofFront, fillColor);
-    DrawTriangle(roofFront, baseBack, roofBack, fillColor);
-  } else {
-    DrawTriangle(baseFront, roofFront, baseBack, fillColor);
-    DrawTriangle(roofFront, roofBack, baseBack, fillColor);
-  }
+  DrawTriangle(baseFront, baseBack, roofFront, fillColor);
+  DrawTriangle(roofFront, baseBack, roofBack, fillColor);
 
   DrawLineEx(baseFront, roofFront, 2.0f, door->color);
   DrawLineEx(roofFront, roofBack, 2.0f, door->color);
   DrawLineEx(roofBack, baseBack, 2.0f, door->color);
-  DrawLineEx(baseBack, baseFront, 2.0f, door->color);
 
   if (door->state == DOOR_CLOSED && door->openProgress <= 0.0f) {
-    float centerX = (baseFront.x + baseBack.x) / 2.0f;
-    float centerY = (baseFront.y + baseBack.y) / 2.0f - door->height / 2.0f;
-    DrawText("X", centerX - 4, centerY - 5, 12, RED);
+    Vector2 doorCenter = {(baseFront.x + baseBack.x) / 2.0f,
+                          (baseFront.y + baseBack.y) / 2.0f - door->height / 2.0f};
+    DrawText("X", doorCenter.x - 5, doorCenter.y - 5, 12, RED);
 
-    float handleAltitude = door->height * 0.45f; // Knob
-    Vector2 knobPos = {baseFront.x + (baseBack.x - baseFront.x) * 0.20f,
-                       (baseFront.y + (baseBack.y - baseFront.y) * 0.20f) -
-                           handleAltitude};
+    Vector2 knobPos = {
+        baseFront.x + (baseBack.x - baseFront.x) * 0.20f,
+        (baseFront.y + (baseBack.y - baseFront.y) * 0.20f) - door->height * 0.45f};
     DrawCircleV(knobPos, 3.0f, GOLD);
     DrawCircleLines((int)knobPos.x, (int)knobPos.y, 3.5f, DARKBROWN);
   } else if (door->openProgress > 0.0f) {
     Vector2 hingeBottom = baseBack;
     Vector2 hingeTop = roofBack;
 
-    Vector2 doorwayVector = {baseFront.x - baseBack.x,
-                             baseFront.y - baseBack.y};
+    Vector2 doorwayVector = {baseFront.x - baseBack.x, baseFront.y - baseBack.y};
     float doorwayPixelSpan = sqrtf(doorwayVector.x * doorwayVector.x +
                                    doorwayVector.y * doorwayVector.y);
-    float leafLength =
-        doorwayPixelSpan *
-        1.1f; // Put a bigger number (now is 110%) for a larger open door
+    float leafLength = doorwayPixelSpan * 1.1f;
 
     Vector2 wallDir = {0.0f, 0.0f};
     if (doorwayPixelSpan > 0.0f) {
@@ -246,34 +249,32 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
       wallDir.y = doorwayVector.y / doorwayPixelSpan;
     }
 
-    // Rotation angle from 0 to PI/2
     float angle = door->openProgress * (PI / 2.0f);
-
-    // Normal vector pointing toward the interior of the room
     float inwardX = (door->wall == WALL_LEFT) ? 1.0f : -1.0f;
 
     Vector2 edgeBottom;
     edgeBottom.x = hingeBottom.x + (wallDir.x * leafLength * cosf(angle)) +
                    (inwardX * leafLength * sinf(angle));
     edgeBottom.y = hingeBottom.y + (wallDir.y * leafLength * cosf(angle));
-
     Vector2 edgeTop = {edgeBottom.x, edgeBottom.y - door->height};
 
-    Color doorLeafColor = {25, 25, 25, 255};
-
+    // Solid door theme color for open leaf fill
+    Color doorLeafColor = door->color;
+    // Correct Counter-Clockwise (CCW) vertex ordering for both side walls
     if (door->wall == WALL_LEFT) {
-      DrawTriangle(hingeBottom, edgeBottom, hingeTop, doorLeafColor);
-      DrawTriangle(hingeTop, edgeBottom, edgeTop, doorLeafColor);
-    } else {
-      DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
-      DrawTriangle(hingeTop, edgeTop, edgeBottom, doorLeafColor);
+        DrawTriangle(hingeBottom, edgeBottom, hingeTop, doorLeafColor);
+        DrawTriangle(hingeTop, edgeBottom, edgeTop, doorLeafColor);
+    } else {    
+        DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
+        DrawTriangle(hingeTop, edgeTop, edgeBottom, doorLeafColor);
     }
 
+    // Door leaf outline & handle knob
     DrawLineEx(hingeBottom, edgeBottom, 2.5f, door->color);
     DrawLineEx(edgeBottom, edgeTop, 2.5f, door->color);
     DrawLineEx(edgeTop, hingeTop, 2.5f, door->color);
 
-    const float handleRatio = 0.90f; // Knob
+    const float handleRatio = 0.90f;
     float handleAltitude = door->height * 0.45f;
     Vector2 knobPos = {
         hingeBottom.x + (edgeBottom.x - hingeBottom.x) * handleRatio,
@@ -284,68 +285,67 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
   }
 }
 
+// Determines if the door structure or leaf physically stands between the camera and the player
 static bool IsDoorInFrontOfPlayer(const Door *door, const Room *room,
                                   const Player *player) {
+  // Back wall door occlusion check
   if (door->wall == WALL_BACK) {
-    // Only occludes if the player has physically moved past the back wall,
-    // entering the space of the outer tunnel.
-    return player->y > room->length;
+    float hingeX = door->position - (door->width / 2.0f);
+    bool behindInY = (player->y >= (room->length - 12.0f));
+    bool behindInX =
+        (player->x <= (hingeX + 10.0f) && player->x >= (hingeX - door->width * 0.8f));
+    return (behindInY && behindInX && door->openProgress > 0.0f);
   }
 
-  // Side doors (WALL_LEFT and WALL_RIGHT):
-  float yBack = door->position + (door->width / 2.0f);
-  float leafSpan = door->height * 0.75f;
+  // Side doors (WALL_LEFT & WALL_RIGHT)
+  // Front edge of the doorway frame is at yFront
+  float yFront = door->position - (door->width / 2.0f);
+  
+  // Horizontal span reach of the door leaf extending into the room floor
+  float leafReachX = door->height * 1.2f;
 
-  // It only occludes if it is behind the hinge and flush against that wall
   if (door->wall == WALL_LEFT) {
-    bool behindInY = (player->y > (yBack - 6.0f));
-    bool nearWallX = (player->x >= 0.0f && player->x <= (leafSpan + 4.0f));
-    return (behindInY && nearWallX && door->openProgress > 0.0f);
+    // Player is deeper in the room than the door's front edge
+    bool playerDeeperThanDoor = (player->y >= yFront - 4.0f);
+    // Player is close enough to the left wall to be occluded by the door structure
+    bool playerNearLeftWall = (player->x >= 0.0f && player->x <= leafReachX);
+    return (playerDeeperThanDoor && playerNearLeftWall);
   } else if (door->wall == WALL_RIGHT) {
-    bool behindInY = (player->y > (yBack - 6.0f));
-    bool nearWallX = (player->x >= (room->width - leafSpan - 4.0f) &&
-                      player->x <= room->width);
-    return (behindInY && nearWallX && door->openProgress > 0.0f);
+    bool playerDeeperThanDoor = (player->y >= yFront - 4.0f);
+    bool playerNearRightWall = (player->x >= (room->width - leafReachX) && player->x <= room->width);
+    return (playerDeeperThanDoor && playerNearRightWall);
   }
 
   return false;
 }
 
+// Determines if the door leaf physically stands in front of the player's sprite
 static bool IsLeafInFrontOfPlayer(const Door *door, const Room *room,
                                   const Player *player) {
-  if (door->state == DOOR_FREE_EXIT || door->openProgress <= 0.0f)
-    return false;
-
-  // Back door: only obscures the view if the player walks right against the
-  // wall behind the door leaf
   if (door->wall == WALL_BACK) {
     float hingeX = door->position - (door->width / 2.0f);
     bool behindInY = (player->y >= (room->length - 12.0f));
     bool behindInX =
-        (player->x <= hingeX && player->x >= (hingeX - door->width * 0.6f));
-    return (behindInY && behindInX);
+        (player->x <= (hingeX + 10.0f) && player->x >= (hingeX - door->width * 0.8f));
+    return (behindInY && behindInX && door->openProgress > 0.0f);
   }
 
-  // Side doors (WALL_LEFT and WALL_RIGHT):
-  // The hinge and the base of the door leaf are at yBack
+  // Side doors (WALL_LEFT and WALL_RIGHT): Hinge base is located at yBack
   float yBack = door->position + (door->width / 2.0f);
   float leafSpan = door->height * 0.75f;
 
-  // CRITICAL CORRECTION:
-  // The leaf can ONLY cover the character if the player's center has
-  // physically moved past the leaf's line toward the back of the room
-  // (player->y > yBack). If the player collides from below (player->y <=
-  // yBack), the leaf remains BEHIND Maroc.
+  float leftWallX  = GetLeftWallX(player->y, room->width);
+  float rightWallX = GetRightWallX(player->y, room->width);
+
   if (door->wall == WALL_LEFT) {
-    bool behindInY =
-        (player->y > yBack); // Removed the cautionary margin (- 6.0f)
-    bool nearWallX = (player->x >= 0.0f && player->x <= (leafSpan + 4.0f));
+    bool behindInY = (player->y > (yBack - 4.0f));
+    bool nearWallX = (player->x >= (leftWallX - 20.0f) &&
+                      player->x <= (leftWallX + leafSpan + 30.0f));
     return (behindInY && nearWallX);
   } else if (door->wall == WALL_RIGHT) {
-    bool behindInY =
-        (player->y > yBack); // Removed the cautionary margin (- 6.0f)
-    bool nearWallX = (player->x >= (room->width - leafSpan - 4.0f) &&
-                      player->x <= room->width);
+    bool behindInY = (player->y > (yBack - 4.0f));
+    bool nearWallX = (player->x <= (rightWallX + 20.0f) &&
+                      player->x >= (rightWallX - leafSpan - 30.0f));
     return (behindInY && nearWallX);
   }
 
@@ -388,8 +388,9 @@ void DrawDoorsInFront(const Room *room, const Player *player, Vector2 scroll) {
 }
 
 void DrawPlayer(const Game *game) {
-  Vector2 shadowPos = {game->projectedPlayer.x + game->cameraScroll.x,
-                       game->projectedPlayer.y + game->cameraScroll.y};
+  Vector2 shadowPos = {
+      game->projectedPlayer.x + game->cameraScroll.x,
+      game->projectedPlayer.y + game->cameraScroll.y};
 
   // Semi-transparent floor shadow oval
   DrawEllipse(shadowPos.x, shadowPos.y, SHADOW_RADIUS_X, SHADOW_RADIUS_Y,
@@ -402,9 +403,7 @@ void DrawPlayer(const Game *game) {
                 PLAYER_HEIGHT, WHITE);
 }
 
-// =============================================================================
-// RETRO ITEM SPRITE RENDERING (src/render.c)
-// =============================================================================
+// Static helper to render retro vector item icons (Key, Scroll, Crown, Treasure, Artifact)
 static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
                            float scale, Color color) {
   switch (category) {
@@ -432,7 +431,6 @@ static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
     break;
   }
   case ITEM_TYPE_CROWN: { // Royal crown with 3 points
-
     Vector2 p1 = {centerPos.x - 8.0f * scale, centerPos.y + 4.0f * scale};
     Vector2 p2 = {centerPos.x - 8.0f * scale, centerPos.y - 4.0f * scale};
     Vector2 p3 = {centerPos.x - 4.0f * scale, centerPos.y};
@@ -449,126 +447,139 @@ static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
     break;
   }
   case ITEM_TYPE_TREASURE: { // Gem / Gleaming chalice
-
     DrawPoly(centerPos, 4, 7.0f * scale, 45.0f, color);
     DrawPolyLines(centerPos, 4, 7.0f * scale, 45.0f, WHITE);
     break;
   }
   case ITEM_TYPE_ARTIFACT: { // Magic artifact
-
     DrawCircleV(centerPos, 6.0f * scale, color);
     DrawCircleLines((int)centerPos.x, (int)centerPos.y, 8.0f * scale, RAYWHITE);
     break;
   }
   }
 }
-
-void DrawHUD(const Game *game) {
-  const Room *room = &game->rooms[game->currentRoom];
-
-  float hudX = FRAME_THICKNESS;
-  float hudY = SCREEN_HEIGHT - HUD_HEIGHT;
-  float hudWidth = VIEWPORT_WIDTH;
-
-  // HUD background with a retro aesthetic
-  DrawRectangle((int)hudX, (int)hudY, (int)hudWidth, (int)HUD_HEIGHT,
-                (Color){15, 15, 22, 255});
-  DrawRectangleLinesEx((Rectangle){hudX, hudY, hudWidth, HUD_HEIGHT}, 3.0f,
-                       GOLD);
-
-  // 1. Room Information (Top-left corner of the HUD)
-  DrawText(room->name, (int)hudX + 20, (int)hudY + 15, 20, YELLOW);
-  DrawText(TextFormat("ROOM: %d / %d", game->currentRoom + 1, game->roomCount),
-           (int)hudX + 20, (int)hudY + 42, 14, RAYWHITE);
-
-  // 2. Maroc’s Inventory (3 slots in the center of the HUD)
-  int invStartX = (int)hudX + (int)(hudWidth * 0.45f);
-  int invStartY = (int)hudY + 25;
-  DrawText("INVENTORY", invStartX, invStartY - 16, 12, LIGHTGRAY);
-
-  for (int i = 0; i < MAX_INVENTORY_ITEMS; i++) {
-    Rectangle slotRect = {(float)(invStartX + i * 65), (float)invStartY, 55.0f,
-                          45.0f};
-    DrawRectangleRec(slotRect, (Color){30, 30, 40, 255});
-    DrawRectangleLinesEx(slotRect, 2.0f, (i == 0) ? GOLD : GRAY);
-
-    if (i < game->player.inventoryCount) {
-      const Item *invItem = &game->player.inventory[i];
-      Vector2 iconCenter = {slotRect.x + 27.0f, slotRect.y + 22.0f};
-      DrawItemSprite(invItem->category, iconCenter, 1.1f, invItem->color);
-    }
-  }
-
-  // 3. Servant Status (Right corner of the HUD)
-  int servantX = (int)hudX + (int)(hudWidth * 0.80f);
-  DrawText("MODE", servantX, invStartY - 16, 12, LIGHTGRAY);
-  if (game->controlMode == CONTROL_MAROC) {
-    DrawText("MAROC", servantX, invStartY + 10, 16, GREEN);
-  } else {
-    DrawText("SERVANT", servantX, invStartY + 10, 16, SKYBLUE);
-  }
-}
-
-void DrawServant(const Servant *s, float roomWidth, Vector2 scroll,
-                 const Game *game) {
-  (void)roomWidth;
-  (void)scroll;
-  (void)game;
-
-  if (!s->active)
-    return;
-
-  // Glowing energy pulse
-  float pulse = sinf((float)GetTime() * 14.0f);
-  Color coreColor =
-      (pulse > 0.0f) ? (Color){255, 105, 180, 255} : (Color){255, 20, 147, 255};
-
-  // Draw strictly at the current screen coordinates (no offsets, no
-  // reprojection)
-  Vector2 orbCenter = {s->screenX, s->screenY};
-  DrawCircleV(orbCenter, 4.5f, coreColor);
-  DrawCircleLines((int)orbCenter.x, (int)orbCenter.y, 6.5f,
-                  (Color){255, 192, 203, 190});
-
-  if (s->carriedItemId != 0) {
-    // DrawItemMiniIcon(s->carriedItemId, (Vector2){orbCenter.x, orbCenter.y
-    // - 10.0f}, game);
-  }
-}
-
 void DrawRoomItems(const Room *room, Vector2 scroll) {
-  float time = (float)GetTime();
-
   for (int i = 0; i < room->itemCount; i++) {
     const Item *item = &room->items[i];
     if (!item->active)
       continue;
 
-    if (!item->isWallItem) {
-      // --- OBJECT ON THE GROUND ---
-      Vector2 floorPos = ProjectRoomPoint(item->x, item->y, room->width);
-      floorPos.x += scroll.x;
-      floorPos.y += scroll.y;
+    Vector2 itemScreen = ProjectRoomPoint(item->x, item->y, room->width);
+    itemScreen.x += scroll.x;
+    itemScreen.y += scroll.y;
 
-      // Shadow on the ground
-      DrawEllipse((int)floorPos.x, (int)floorPos.y, 8, 4,
-                  (Color){0, 0, 0, 100});
-
-      // Gentle floating (bobbing)
-      float hoverOffset = sinf(time * 3.0f + item->id) * 3.0f;
-      Vector2 itemCenter = {floorPos.x, floorPos.y - 8.0f - hoverOffset};
-
-      DrawItemSprite(item->category, itemCenter, 1.0f, item->color);
+    if (item->isWallItem) {
+      DrawRectangle(itemScreen.x - 6, itemScreen.y - 40, 12, 12, item->color);
+      DrawRectangleLines(itemScreen.x - 6, itemScreen.y - 40, 12, 12, GOLD);
     } else {
-      // --- OBJECT ON THE WALL (Wall projection) ---
-      Vector2 wallBase = ProjectRoomPoint(item->x, item->y, room->width);
-      wallBase.x += scroll.x;
-      wallBase.y += scroll.y - item->wallHeightOffset;
+      DrawCircleV(itemScreen, 6.0f, item->color);
+      DrawCircleLines((int)itemScreen.x, (int)itemScreen.y, 6.5f, WHITE);
+    }
+  }
+}
 
-      DrawItemSprite(item->category, wallBase, 1.0f, item->color);
-      // Gleam on wall
-      DrawCircleLines((int)wallBase.x, (int)wallBase.y, 10.0f,
-                      (Color){255, 255, 255, 90});
+void DrawServant(const Servant *servant, float roomWidth, Vector2 cameraScroll,
+                 const Game *game) {
+  (void)roomWidth;
+  (void)cameraScroll;
+  (void)game;
+
+  if (!servant->active)
+    return;
+
+  Vector2 servantCenter = {servant->screenX, servant->screenY};
+
+  DrawCircleV(servantCenter, 8.0f, YELLOW);
+  DrawCircleLines((int)servantCenter.x, (int)servantCenter.y, 8.5f, GOLD);
+
+  DrawCircleV((Vector2){servantCenter.x - 3, servantCenter.y - 2}, 1.5f, BLACK);
+  DrawCircleV((Vector2){servantCenter.x + 3, servantCenter.y - 2}, 1.5f, BLACK);
+}
+
+void DrawHUD(const Game *game) {
+  const Room *room = &game->rooms[game->currentRoom];
+
+  // Base coordinates for HUD parchment (positioned behind the decorative frame)
+  float hudX = FRAME_THICKNESS;
+  float hudY = SCREEN_HEIGHT - HUD_HEIGHT;
+  float hudWidth = VIEWPORT_WIDTH;
+  float hudHeight = HUD_HEIGHT;
+
+  // --- 1. PROCEDURAL PARCHMENT RENDERING (DRAGONTORC RETRO STYLE) ---
+  Color parchmentBg     = (Color){228, 196, 76, 255}; // Golden parchment background
+  Color parchmentShadow = (Color){195, 160, 50, 255}; // Rolled edge shadow
+  Color parchmentBorder = (Color){70, 45, 10, 255};   // Dark brown ink outline
+  Color inkColor        = (Color){40, 20, 5, 255};    // Primary ink text
+  Color inkSubtle       = (Color){90, 60, 20, 255};   // Secondary ink text
+
+  // Main parchment body
+  DrawRectangle((int)hudX, (int)hudY, (int)hudWidth, (int)hudHeight, parchmentBg);
+
+  // Top and bottom rolled edges
+  DrawRectangle((int)hudX, (int)hudY, (int)hudWidth, 14, parchmentShadow);
+  DrawRectangle((int)hudX, (int)(hudY + hudHeight - 14), (int)hudWidth, 14, parchmentShadow);
+  DrawLineEx((Vector2){hudX, hudY + 14}, (Vector2){hudX + hudWidth, hudY + 14}, 2.0f, parchmentBorder);
+  DrawLineEx((Vector2){hudX, hudY + hudHeight - 14}, (Vector2){hudX + hudWidth, hudY + hudHeight - 14}, 2.0f, parchmentBorder);
+
+  // Scroll corner ears/knobs
+  DrawCircle((int)hudX + 8, (int)hudY + 7, 6.0f, parchmentBorder);
+  DrawCircle((int)(hudX + hudWidth - 8), (int)hudY + 7, 6.0f, parchmentBorder);
+  DrawCircle((int)hudX + 8, (int)(hudY + hudHeight - 7), 6.0f, parchmentBorder);
+  DrawCircle((int)(hudX + hudWidth - 8), (int)(hudY + hudHeight - 7), 6.0f, parchmentBorder);
+
+  // Inner decorative border
+  DrawRectangleLinesEx((Rectangle){hudX + 8, hudY + 16, hudWidth - 16, hudHeight - 32}, 2.0f, parchmentBorder);
+
+  // --- 2. INTERNAL SAFE MARGINS (PREVENT OVERLAP WITH FRAME) ---
+  float safeLeft = hudX + 45.0f;        // X = 95px (Wide left margin)
+  float safeTop  = hudY + 28.0f;        // Y = 448px (Padded from top scroll edge)
+
+  // --- 3. HUD CONTENT & TEXT LAYOUT ---
+  // Column 1: Room Info (Left)
+  DrawText(room->name, (int)safeLeft, (int)safeTop, 20, inkColor);
+  DrawText(TextFormat("Room: %d / %d", game->currentRoom + 1, game->roomCount),
+           (int)safeLeft, (int)safeTop + 28, 14, inkSubtle);
+  DrawText(TextFormat("Doors in room: %d", room->doorCount),
+           (int)safeLeft, (int)safeTop + 48, 14, inkSubtle);
+
+  // Column 2: Control & Servant Status (Center)
+  float col2X = safeLeft + 230.0f;      // X = 325px
+  DrawText("CONTROL MODE", (int)col2X, (int)safeTop, 12, inkSubtle);
+
+  if (game->controlMode == CONTROL_MAROC) {
+    DrawText("MAROC (Mage)", (int)col2X, (int)safeTop + 16, 16, (Color){0, 110, 20, 255});
+    DrawText("[S] Switch to Servant", (int)col2X, (int)safeTop + 36, 12, inkSubtle);
+  } else {
+    DrawText("SERVANT (Trance)", (int)col2X, (int)safeTop + 16, 16, (Color){160, 40, 0, 255});
+    DrawText("[S] Return to Maroc", (int)col2X, (int)safeTop + 36, 12, inkSubtle);
+  }
+
+  if (game->servant.active) {
+    if (game->servant.carriedItemId != 0) {
+      DrawText(TextFormat("Servant: Carrying Item #%d", game->servant.carriedItemId),
+               (int)col2X, (int)safeTop + 56, 12, (Color){20, 70, 140, 255});
+    } else {
+      DrawText("Servant: Active (Empty hands)", (int)col2X, (int)safeTop + 56, 12, (Color){20, 70, 140, 255});
+    }
+  } else {
+    DrawText("Servant: Inactive", (int)col2X, (int)safeTop + 56, 12, inkSubtle);
+  }
+
+  // Column 3: Maroc Inventory (Right)
+  float invStartX = safeLeft + 450.0f;  // X = 545px (Ends at X = 689px)
+  DrawText("MAROC INVENTORY", (int)invStartX, (int)safeTop, 12, inkSubtle);
+
+  for (int i = 0; i < MAX_INVENTORY_ITEMS; i++) {
+    Rectangle slotRect = {invStartX + i * 48.0f, safeTop + 20.0f, 42.0f, 42.0f};
+
+    // Parchment inventory slot boxes with dark ink border
+    DrawRectangleRec(slotRect, (Color){248, 228, 150, 255});
+    DrawRectangleLinesEx(slotRect, 2.0f, (i == 0) ? (Color){160, 40, 0, 255} : parchmentBorder);
+
+    if (i < game->player.inventoryCount) {
+      const Item *invItem = &game->player.inventory[i];
+      Vector2 iconCenter = {slotRect.x + 21.0f, slotRect.y + 21.0f};
+      DrawItemSprite(invItem->category, iconCenter, 0.95f, invItem->color);
     }
   }
 }

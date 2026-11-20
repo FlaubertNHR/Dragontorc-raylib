@@ -3,6 +3,12 @@
 
 #include "raylib.h"
 
+// Returns the logical X boundary of the left wall at depth y
+float GetLeftWallX(float y, float roomWidth);
+
+// Returns the logical X boundary of the right wall at depth y
+float GetRightWallX(float y, float roomWidth);
+
 // Projects logical room coordinates (x, y) into 2.5D trapezoidal screen coordinates
 Vector2 ProjectRoomPoint(float x, float y, float roomWidth);
 

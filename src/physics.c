@@ -12,7 +12,6 @@ void ApplyBounce(Player *player, float forceX, float forceY) {
 void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
                          float dt) {
   Player *p = &game->player;
-  Room *r = &game->rooms[game->currentRoom];
 
   float moveX = 0.0f;
   float moveY = 0.0f;
@@ -21,11 +20,7 @@ void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
   p->levitationTimer += dt * LEVITATION_SPEED;
   p->floatingOffset = sinf(p->levitationTimer) * LEVITATION_AMPLITUDE;
 
-  // Visual unit ratio to ensure identical screen movement speed across all room
-  // sizes
-  Vector2 basePoint = ProjectRoomPoint(0.0f, p->y, r->width);
-  Vector2 testPoint = ProjectRoomPoint(1.0f, p->y, r->width);
-  float pixelsPerLogicalUnit = fabsf(testPoint.x - basePoint.x);
+  float pixelsPerLogicalUnit = PROJECTION_SCALE;
 
   // If bouncing, player has no input control; smooth friction takes over
   if (p->bounceLockoutTimer > 0.0f) {
@@ -59,11 +54,7 @@ void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
       moveX /= length;
       moveY /= length;
 
-      float stepX = 0.0f;
-      if (pixelsPerLogicalUnit > 0.0f) {
-        stepX = (moveX * (p->speed * SPEED_MULTIPLIER_X) * dt) /
-                pixelsPerLogicalUnit;
-      }
+      float stepX = (moveX * (p->speed * SPEED_MULTIPLIER_X) * dt) / pixelsPerLogicalUnit;
       float stepY = moveY * p->speed * dt;
 
       p->x += stepX;
@@ -84,15 +75,15 @@ void TransitionToRoom(Game *game, const Door *crossedDoor) {
     Door *dest = &nextRoom->doors[i];
     if (dest->id == targetDoorId) {
       if (dest->wall == WALL_LEFT) {
-        game->player.x = DOOR_TRANSITION_STEP_X; // A step inward
+        float leftWall = GetLeftWallX(dest->position, nextRoom->width);
+        game->player.x = leftWall + DOOR_TRANSITION_STEP_X; // A step inward
         game->player.y = dest->position;
       } else if (dest->wall == WALL_RIGHT) {
-        game->player.x = nextRoom->width - DOOR_TRANSITION_STEP_X; // A step inward
+        float rightWall = GetRightWallX(dest->position, nextRoom->width);
+        game->player.x = rightWall - DOOR_TRANSITION_STEP_X;
         game->player.y = dest->position;
       } else if (dest->wall == WALL_BACK) {
         game->player.x = dest->position;
-        // We shift the position toward the front of the room so that it does
-        // not end up buried beneath the lintel or inside the black frame
         game->player.y = nextRoom->length - DOOR_TRANSITION_BACK_MARGIN_Y;
       }
       break;
@@ -110,23 +101,26 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   bool hasChangedRoom = false;
   Door crossedDoor;
 
+  float leftWallX = GetLeftWallX(p->y, r->width);
+  float rightWallX = GetRightWallX(p->y, r->width);
+
   // --- 1. LEFT WALL COLLISION ---
-  if (p->x < SIDE_WALL_DETECTION_MARGIN) {
+  if (p->x < (leftWallX + SIDE_WALL_DETECTION_MARGIN)) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
       if (d->wall == WALL_LEFT) {
-        float centerMarginY = d->width / 4.0f;
+        float centerMarginY = (d->width / 2.0f) - 1.0f;
         if (p->y >= (d->position - centerMarginY) &&
             p->y <= (d->position + centerMarginY)) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, BOUNCE_IMPULSE_FORCE, 0.0f);
-            p->x = 0.0f;
+            p->x = leftWallX;
             insideDoorway = false;
           } else {
             insideDoorway = true;
-            if (p->x < -DOOR_TRIGGER_THRESHOLD_SIDE) {
+            if (p->x < (leftWallX - DOOR_TRIGGER_THRESHOLD_SIDE)) {
               crossedDoor = *d;
               hasChangedRoom = true;
             }
@@ -135,27 +129,27 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway && p->x < 0.0f)
-      p->x = 0.0f;
+    if (!insideDoorway && p->x < leftWallX)
+      p->x = leftWallX;
   }
 
   // --- 2. RIGHT WALL COLLISION ---
-  if (p->x > (r->width - SIDE_WALL_DETECTION_MARGIN) && !hasChangedRoom) {
+  if (p->x > (rightWallX - SIDE_WALL_DETECTION_MARGIN) && !hasChangedRoom) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
       if (d->wall == WALL_RIGHT) {
-        float centerMarginY = d->width / 4.0f;
+        float centerMarginY = (d->width / 2.0f) - 1.0f;
         if (p->y >= (d->position - centerMarginY) &&
             p->y <= (d->position + centerMarginY)) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, -BOUNCE_IMPULSE_FORCE, 0.0f);
-            p->x = r->width;
+            p->x = rightWallX;
             insideDoorway = false;
           } else {
             insideDoorway = true;
-            if (p->x > (r->width + DOOR_TRIGGER_THRESHOLD_SIDE)) {
+            if (p->x > (rightWallX + DOOR_TRIGGER_THRESHOLD_SIDE)) {
               crossedDoor = *d;
               hasChangedRoom = true;
             }
@@ -164,8 +158,8 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway && p->x > r->width)
-      p->x = r->width;
+    if (!insideDoorway && p->x > rightWallX)
+      p->x = rightWallX;
   }
 
   // --- 3. BACK WALL COLLISION ---
@@ -174,7 +168,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
       if (d->wall == WALL_BACK) {
-        float centerMarginX = d->width / 4.0f;
+        float centerMarginX = (d->width / 2.0f) - 2.0f;
         if (p->x >= (d->position - centerMarginX) &&
             p->x <= (d->position + centerMarginX)) {
           if (d->state == DOOR_CLOSED) {
@@ -207,19 +201,15 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
       Door *d = &r->doors[i];
       if (d->state == DOOR_OPEN &&
           (d->wall == WALL_LEFT || d->wall == WALL_RIGHT)) {
-        // Position of the leaf line on the floor (rear frame where the hinge is
-        // located)
         float leafY = d->position + (d->width / 2.0f);
         const float shadowFloorY = SHADOW_RADIUS_Y / 1.55f;
 
-        // Hinge position on screen
-        float wallX = (d->wall == WALL_LEFT) ? 1.0f : (r->width - 1.0f);
+        float wallX = (d->wall == WALL_LEFT) ? GetLeftWallX(leafY, r->width) : GetRightWallX(leafY, r->width);
         Vector2 rearBase = ProjectRoomPoint(wallX, leafY, r->width);
         rearBase.x += game->cameraScroll.x;
 
         float leafWidthPixels = d->height * 0.75f;
 
-        // Horizontal screen check (matches DrawSideDoor rendering)
         bool inLeafRangeScreen = false;
         if (d->wall == WALL_LEFT) {
           float leafTipX = rearBase.x + leafWidthPixels;
@@ -230,15 +220,10 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
 
         if (inLeafRangeScreen) {
-          // ompute position of the top edge of the shadow's ellipse
           float prevShadowTop = prevY + shadowFloorY;
           float currShadowTop = p->y + shadowFloorY;
 
-          // Contact is detected as soon as the TOP part of the shadow
-          // reaches the wood
           if (prevShadowTop <= leafY && currShadowTop >= leafY) {
-            // Position the top part of the ellipse exactly on the line
-            // on the sheet
             p->y = leafY - shadowFloorY;
           }
         }
@@ -259,7 +244,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         float leafY = d->position + (d->width / 2.0f);
         const float shadowFloorY = SHADOW_RADIUS_Y / 1.55f;
 
-        float wallX = (d->wall == WALL_LEFT) ? 1.0f : (r->width - 1.0f);
+        float wallX = (d->wall == WALL_LEFT) ? GetLeftWallX(leafY, r->width) : GetRightWallX(leafY, r->width);
         Vector2 rearBase = ProjectRoomPoint(wallX, leafY, r->width);
         rearBase.x += game->cameraScroll.x;
 
@@ -287,7 +272,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
     }
   }
 
-  // --- 6. BLOCK BACK DOORS IF PASSING FROM right (moveX < 0) ---
+  // --- 6. BLOCK BACK DOORS IF PASSING FROM RIGHT (moveX < 0) ---
   if (moveX < 0.0f) {
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
@@ -307,9 +292,11 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
       }
     }
   }
+
   // --- 7. CLOSE BACK DOOR VIA HORIZONTAL PUSH (moveX > 0) ---
   if (moveX > 0.0f) {
     Vector2 projectedPos = ProjectRoomPoint(p->x, p->y, r->width);
+    screenShadowPos: ;
     Vector2 screenShadowPos = {projectedPos.x + game->cameraScroll.x,
                                projectedPos.y + game->cameraScroll.y};
 
@@ -341,30 +328,10 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
 
   // --- 8. FRONT ROOM BOUNDARY COLLISION ---
   if (p->y < 0.0f) {
-    p->y = prevY;
+    p->y = 0.0f;
   }
 
-  // --- 9. FAN PERSPECTIVE COMPLIANCE (ONLY ON NET VERTICAL DISPLACEMENT) ---
-if (moveY != 0.0f && p->y != prevY) {
-    float stepY = (p->y - prevY);
-    float roomCenter = r->width / 2.0f;
-    float deviation  = p->x - roomCenter;
-
-    // 1. Width of the projected floor area at the front and at the rear  
-    float frontSpan = r->width - (2 * PROJECTION_LEFT_FRONT_X); 
-    float backSpan  = r->width - (2 * PROJECTION_LEFT_BACK_X);  
-    float spanDiff  = frontSpan - backSpan; 
-
-    // 2. Exact width of the ground at the player's current Y coordinate    
-    float currentSpanY = frontSpan - spanDiff * (p->y / FIXED_VISUAL_DEPTH);
-
-    // 3. Exact dynamic compensation   
-    if (currentSpanY > 0.0f) {
-        p->x += (spanDiff / FIXED_VISUAL_DEPTH) * (deviation / currentSpanY) * stepY;
-    }
-}
-
-  // --- 8. TRIGGER ROOM SWITCH ---
+  // --- 9. TRIGGER ROOM SWITCH ---
   if (hasChangedRoom) {
     TransitionToRoom(game, &crossedDoor);
   }
@@ -412,9 +379,9 @@ void UpdateServantPhysics(Game *game, float dt) {
   if (IsKeyDown(KEY_LEFT))
     moveX -= 1.0f;
   if (IsKeyDown(KEY_UP))
-    moveY -= 1.0f; // Pure screen UP (-Y)
+    moveY -= 1.0f;
   if (IsKeyDown(KEY_DOWN))
-    moveY += 1.0f; // Pure screen DOWN (+Y)
+    moveY += 1.0f;
 
   if (moveX != 0.0f || moveY != 0.0f) {
     float inputLength = sqrtf(moveX * moveX + moveY * moveY);
@@ -437,8 +404,7 @@ void UpdateServantPhysics(Game *game, float dt) {
       s->screenY = SCREEN_HEIGHT - screenPadding;
 
     // 4. Vertical limits: front room floor threshold and top of the back wall
-    Vector2 frontFloorCenter =
-        ProjectRoomPoint(r->width * 0.5f, 4.0f, r->width);
+    Vector2 frontFloorCenter = ProjectRoomPoint(r->width * 0.5f, 4.0f, r->width);
     float maxScreenBottom = frontFloorCenter.y + game->cameraScroll.y;
     if (s->screenY > maxScreenBottom) {
       s->screenY = maxScreenBottom;
@@ -452,13 +418,11 @@ void UpdateServantPhysics(Game *game, float dt) {
       s->screenY = minScreenTop;
     }
 
-    // =====================================================================
-    // 5. HORIZONTAL LIMITS: OUTERMOST VERTICAL WALL BOUNDARIES
-    // =====================================================================
-    // The outermost vertical edges of the room walls are given by the
-    // front floor corners (x = 0.0f and x = r->width at y = 0.0f).
-    Vector2 leftFrontCorner = ProjectRoomPoint(0.0f, 0.0f, r->width);
-    Vector2 rightFrontCorner = ProjectRoomPoint(r->width, 0.0f, r->width);
+    // 5 Horizontal limits
+    float leftFrontX = GetLeftWallX(0.0f, r->width);
+    float rightFrontX = GetRightWallX(0.0f, r->width);
+    Vector2 leftFrontCorner = ProjectRoomPoint(leftFrontX, 0.0f, r->width);
+    Vector2 rightFrontCorner = ProjectRoomPoint(rightFrontX, 0.0f, r->width);
 
     float outermostLeftX = leftFrontCorner.x + game->cameraScroll.x;
     float outermostRightX = rightFrontCorner.x + game->cameraScroll.x;
@@ -470,58 +434,44 @@ void UpdateServantPhysics(Game *game, float dt) {
       s->screenX = outermostRightX;
     }
 
-    // =====================================================================
-    // 6. DERIVE LOGICAL COORDINATES (s->x, s->y) FOR ITEM/DOOR INTERACTIONS
-    // =====================================================================
-    float localY = -(s->screenY - game->cameraScroll.y) / (PROJECTION_Y_FACTOR * 1.3f);
+    float localY = -(s->screenY - game->cameraScroll.y) / (PROJECTION_Y_FACTOR * PROJECTION_SCALE);
     if (localY < 4.0f)
       localY = 4.0f;
     if (localY > r->length)
       localY = r->length;
     s->y = localY;
 
-    // Calculate trapezoid horizontal bounds at current depth (s->y)
-    float factorY = s->y / FIXED_VISUAL_DEPTH;
-    if (factorY < 0.0f)
-      factorY = 0.0f;
-    if (factorY > 1.0f)
-      factorY = 1.0f;
-
-    float frontLeftX = PROJECTION_LEFT_FRONT_X;
-    float backLeftX = PROJECTION_LEFT_BACK_X;
-    float screenLeftLimit =
-        (frontLeftX + (backLeftX - frontLeftX) * factorY) * 1.3f;
-
-    float frontRightX = r->width - PROJECTION_LEFT_FRONT_X;
-    float backRightX = r->width - PROJECTION_LEFT_BACK_X;
-    float screenRightLimit =
-        (frontRightX + (backRightX - frontRightX) * factorY) * 1.3f;
+    float screenLeftLimit = GetLeftWallX(s->y, r->width) * PROJECTION_SCALE;
+    float screenRightLimit = GetRightWallX(s->y, r->width) * PROJECTION_SCALE;
 
     float visibleRoomWidth = screenRightLimit - screenLeftLimit;
     float localScreenX = s->screenX - game->cameraScroll.x;
 
     if (visibleRoomWidth > 0.0f) {
       float factorX = (localScreenX - screenLeftLimit) / visibleRoomWidth;
-      s->x = factorX * r->width;
+      s->x = GetLeftWallX(s->y, r->width) + factorX * (GetRightWallX(s->y, r->width) - GetLeftWallX(s->y, r->width));
     }
 
     // Clamp logical coordinates to valid floor ground so dropping an item
     // always lands strictly inside the playable room scenario
-    if (s->x < 4.0f)
-      s->x = 4.0f;
-    if (s->x > (r->width - 4.0f))
-      s->x = r->width - 4.0f;
+    float minX = GetLeftWallX(s->y, r->width) + 4.0f;
+    float maxX = GetRightWallX(s->y, r->width) - 4.0f;
+    if (s->x < minX)
+      s->x = minX;
+    if (s->x > maxX)
+      s->x = maxX;
   }
 }
 
 static Vector2 GetSideDoorHandleScreenPos(const Door *door, const Room *room,
                                           Vector2 cameraScroll) {
-  float yFront = door->position - (door->width / 2.0f); // Latch / front frame
-  float yBack = door->position + (door->width / 2.0f);  // Hinge / rear frame
-  float xWall = (door->wall == WALL_LEFT) ? 1.0f : (room->width - 1.0f);
+  float yFront = door->position - (door->width / 2.0f);
+  float yBack = door->position + (door->width / 2.0f);
+  float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width) : GetRightWallX(yFront, room->width);
+  float xWallBack  = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width)  : GetRightWallX(yBack, room->width);
 
-  Vector2 baseFront = ProjectRoomPoint(xWall, yFront, room->width);
-  Vector2 baseBack = ProjectRoomPoint(xWall, yBack, room->width);
+  Vector2 baseFront = ProjectRoomPoint(xWallFront, yFront, room->width);
+  Vector2 baseBack = ProjectRoomPoint(xWallBack, yBack, room->width);
   baseFront.x += cameraScroll.x;
   baseFront.y += cameraScroll.y;
   baseBack.x += cameraScroll.x;
@@ -531,16 +481,16 @@ static Vector2 GetSideDoorHandleScreenPos(const Door *door, const Room *room,
   Vector2 handlePos = {0.0f, 0.0f};
 
   if (door->state == DOOR_CLOSED || door->openProgress <= 0.0f) {
-    // --- PUERTA CERRADA ---
-    // La bisagra está en baseBack. Por tanto, el picaporte está en el lado
-    // opuesto: junto al marco frontal (baseFront), desplazado un 20% hacia el
+    // --- Closed door ---
+    // Hinge is at baseBack. So handle is at the opposite side
+    // : near the front (baseFront), 20% displaced to the center
     // centro.
     handlePos.x = baseFront.x + (baseBack.x - baseFront.x) * 0.20f;
     handlePos.y =
         (baseFront.y + (baseBack.y - baseFront.y) * 0.20f) - handleAltitude;
   } else {
-    // --- PUERTA ABIERTA / ABRIÉNDOSE ---
-    // La hoja gira anclada en baseBack. El picaporte está en el borde libre
+    // --- Opne/Opening Door ---
+    // Door leaf is anchores at baseBack. Door handle is on the free edge
     // (edgeBottom)
     Vector2 hingeBottom = baseBack;
 
@@ -559,14 +509,14 @@ static Vector2 GetSideDoorHandleScreenPos(const Door *door, const Room *room,
     float angle = door->openProgress * (PI / 2.0f);
     float inwardX = (door->wall == WALL_LEFT) ? 1.0f : -1.0f;
 
-    // Borde libre exterior de la hoja de madera
+    // Outer free edge of the wooden leaf
     Vector2 edgeBottom;
     edgeBottom.x = hingeBottom.x + (wallDir.x * leafLength * cosf(angle)) +
                    (inwardX * leafLength * sinf(angle));
     edgeBottom.y = hingeBottom.y + (wallDir.y * leafLength * cosf(angle));
 
-    // El pomo está situado justo en ese extremo libre móvil (al 90% de la
-    // distancia desde la bisagra)
+    // The knob is located right at that free moving end (at 90% of the 
+    // distance from the hinge).
     const float handleRatio = 0.90f;
     handlePos.x = hingeBottom.x + (edgeBottom.x - hingeBottom.x) * handleRatio;
     handlePos.y =
@@ -650,8 +600,7 @@ void UpdateItemPickups(Game *game) {
   Player *p = &game->player;
   Room *r = &game->rooms[game->currentRoom];
 
-  const float pickupRadius =
-      18.0f; // Logical pickup distance, with the shadow of Maroc
+  const float pickupRadius = 18.0f;
   const float pickupRadiusSq = pickupRadius * pickupRadius;
 
   bool standingOnLockoutItem = false;
@@ -695,12 +644,12 @@ void UpdateItemPickups(Game *game) {
 
         *item = droppedItem;
 
-        p->pickupLockoutItemId = droppedItem.id; 
-        standingOnLockoutItem = true;        
+        p->pickupLockoutItemId = droppedItem.id;
+        standingOnLockoutItem = true;
       }
     }
   }
   if (!standingOnLockoutItem) {
-     p->pickupLockoutItemId = 0; 
-  }  
+    p->pickupLockoutItemId = 0;
+  }
 }

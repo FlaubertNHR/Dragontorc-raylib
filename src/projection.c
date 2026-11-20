@@ -1,28 +1,24 @@
 #include "projection.h"
 #include "config.h"
 
-Vector2 ProjectRoomPoint(float x, float y, float roomWidth) {
-    Vector2 screenPos;
-
+float GetLeftWallX(float y, float roomWidth) {
+    (void)roomWidth;
     float factorY = y / FIXED_VISUAL_DEPTH;
-    if (factorY < PROJECTION_MIN_FACTOR_Y) factorY = PROJECTION_MIN_FACTOR_Y; // Frontal limit
-    if (factorY > 1.0f) factorY = 1.0f; // Back wall Limit
+    if (factorY < PROJECTION_MIN_FACTOR_Y) factorY = PROJECTION_MIN_FACTOR_Y;
+    if (factorY > 1.0f) factorY = 1.0f;
 
-    float leftFrontX = PROJECTION_LEFT_FRONT_X;
-    float leftBackX  = PROJECTION_LEFT_BACK_X;
-    float leftScreenLimit = leftFrontX + (leftBackX - leftFrontX) * factorY;
+    return PROJECTION_LEFT_FRONT_X + (PROJECTION_LEFT_BACK_X - PROJECTION_LEFT_FRONT_X) * factorY;
+}
 
-    float rightFrontX = roomWidth - PROJECTION_LEFT_FRONT_X;
-    float rightBackX  = roomWidth - PROJECTION_LEFT_BACK_X;
-    float rightScreenLimit = rightFrontX + (rightBackX - rightFrontX) * factorY;
+float GetRightWallX(float y, float roomWidth) {
+    float leftX = GetLeftWallX(y, roomWidth);
+    return roomWidth - leftX;
+}
 
-    float factorX = (roomWidth > 0.0f) ? (x / roomWidth) : 0.0f;
-
-    screenPos.x = leftScreenLimit + (rightScreenLimit - leftScreenLimit) * factorX;
-    screenPos.y = -(y * PROJECTION_Y_FACTOR);
-
-    screenPos.x *= PROJECTION_SCALE;
-    screenPos.y *= PROJECTION_SCALE;
-
+Vector2 ProjectRoomPoint(float x, float y, float roomWidth) {
+    (void)roomWidth;
+    Vector2 screenPos;
+    screenPos.x = x * PROJECTION_SCALE;
+    screenPos.y = -(y * PROJECTION_Y_FACTOR) * PROJECTION_SCALE;
     return screenPos;
 }
