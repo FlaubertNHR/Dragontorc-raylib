@@ -338,13 +338,13 @@ static bool IsLeafInFrontOfPlayer(const Door *door, const Room *room,
   float rightWallX = GetRightWallX(player->y, room->width);
 
   if (door->wall == WALL_LEFT) {
-    bool behindInY = (player->y > (yBack - 4.0f));
-    bool nearWallX = (player->x >= (leftWallX - 30.0f) &&
+    bool behindInY = (player->y > yBack);
+    bool nearWallX = (player->x >= (leftWallX - 20.0f) &&
                       player->x <= (leftWallX + leafSpan + 30.0f));
     return (behindInY && nearWallX);
   } else if (door->wall == WALL_RIGHT) {
-    bool behindInY = (player->y > (yBack - 4.0f));
-    bool nearWallX = (player->x <= (rightWallX + 30.0f) &&
+    bool behindInY = (player->y > yBack);
+    bool nearWallX = (player->x <= (rightWallX + 20.0f) &&
                       player->x >= (rightWallX - leafSpan - 30.0f));
     return (behindInY && nearWallX);
   }

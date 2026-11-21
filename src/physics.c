@@ -117,7 +117,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         float yBack = d->position + (d->width / 2.0f);
 
         // Walkable doorway threshold ends before the rear hinge line
-        if (p->y >= yFront && p->y <= (yBack - 4.0f)) {
+        if (p->y >= yFront && p->y <= yBack) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, BOUNCE_IMPULSE_FORCE, 0.0f);
@@ -148,7 +148,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         float yBack = d->position + (d->width / 2.0f);
 
         // Walkable doorway threshold ends before the rear hinge line
-        if (p->y >= yFront && p->y <= (yBack - 4.0f)) {
+        if (p->y >= yFront && p->y <= yBack) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, -BOUNCE_IMPULSE_FORCE, 0.0f);
@@ -181,7 +181,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, 0.0f, -BOUNCE_IMPULSE_FORCE);
-            p->y = r->length - shadowRadiusY; 
+            p->y = r->length - shadowRadiusY;
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -206,7 +206,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
 
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
-      if (d->state == DOOR_OPEN &&
+      if ((d->state == DOOR_OPEN || d->state == DOOR_OPENING || d->state == DOOR_CLOSING) &&
           (d->wall == WALL_LEFT || d->wall == WALL_RIGHT)) {
         float leafY = d->position + (d->width / 2.0f);
         const float shadowFloorY = SHADOW_RADIUS_Y / 1.55f;
@@ -226,12 +226,9 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           inLeafRangeScreen = (screenShadow.x >= leafTipX);
         }
 
-        if (inLeafRangeScreen) {
-          float prevShadowTop = prevY + shadowFloorY;
-          float currShadowTop = p->y + shadowFloorY;
-
-          if (prevShadowTop <= leafY && currShadowTop >= leafY) {
-            p->y = leafY - shadowFloorY;
+        if (inLeafRangeScreen && prevY <= leafY + 2.0f) {
+          if ((p->y + shadowFloorY) >= leafY) {
+            p->y = leafY - shadowFloorY; // <--- MODIFICADO: Retiene la sombra por delante del vano
           }
         }
       }
@@ -246,7 +243,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
 
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
-      if (d->state == DOOR_OPEN &&
+      if ((d->state == DOOR_OPEN || d->state == DOOR_OPENING || d->state == DOOR_CLOSING) &&
           (d->wall == WALL_LEFT || d->wall == WALL_RIGHT)) {
         float leafY = d->position + (d->width / 2.0f);
         const float shadowFloorY = SHADOW_RADIUS_Y / 1.55f;
@@ -266,13 +263,12 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           inLeafRangeScreen = (screenShadow.x >= leafTipX);
         }
 
-        if (inLeafRangeScreen && prevY >= leafY) {
-          float prevShadowBottom = prevY - shadowFloorY;
-          float currShadowBottom = p->y - shadowFloorY;
-
-          if (prevShadowBottom >= leafY && currShadowBottom <= leafY) {
-            d->state = DOOR_CLOSING;
-            p->y = leafY + shadowFloorY;
+        if (inLeafRangeScreen && prevY >= leafY - 2.0f) {
+          if ((p->y - shadowFloorY) <= leafY) {
+            if (d->state == DOOR_OPEN || d->state == DOOR_OPENING) {
+              d->state = DOOR_CLOSING; // <--- MODIFICADO: Inicia el cierre de la puerta
+            }
+            p->y = leafY + shadowFloorY; // <--- MODIFICADO: Retiene a Maroc detras de la hoja mientras se cierra
           }
         }
       }
@@ -303,7 +299,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   // --- 7. CLOSE BACK DOOR VIA HORIZONTAL PUSH (moveX > 0) ---
   if (moveX > 0.0f) {
     Vector2 projectedPos = ProjectRoomPoint(p->x, p->y, r->width);
-    screenShadowPos: ;
+  screenShadowPos:;
     Vector2 screenShadowPos = {projectedPos.x + game->cameraScroll.x,
                                projectedPos.y + game->cameraScroll.y};
 
@@ -475,7 +471,7 @@ static Vector2 GetSideDoorHandleScreenPos(const Door *door, const Room *room,
   float yFront = door->position - (door->width / 2.0f);
   float yBack = door->position + (door->width / 2.0f);
   float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width) : GetRightWallX(yFront, room->width);
-  float xWallBack  = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width)  : GetRightWallX(yBack, room->width);
+  float xWallBack = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width) : GetRightWallX(yBack, room->width);
 
   Vector2 baseFront = ProjectRoomPoint(xWallFront, yFront, room->width);
   Vector2 baseBack = ProjectRoomPoint(xWallBack, yBack, room->width);
@@ -522,7 +518,7 @@ static Vector2 GetSideDoorHandleScreenPos(const Door *door, const Room *room,
                    (inwardX * leafLength * sinf(angle));
     edgeBottom.y = hingeBottom.y + (wallDir.y * leafLength * cosf(angle));
 
-    // The knob is located right at that free moving end (at 90% of the 
+    // The knob is located right at that free moving end (at 90% of the
     // distance from the hinge).
     const float handleRatio = 0.90f;
     handlePos.x = hingeBottom.x + (edgeBottom.x - hingeBottom.x) * handleRatio;
