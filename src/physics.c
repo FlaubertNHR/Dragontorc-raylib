@@ -110,9 +110,11 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
       if (d->wall == WALL_LEFT) {
-        float centerMarginY = (d->width / 2.0f) - 1.0f;
-        if (p->y >= (d->position - centerMarginY) &&
-            p->y <= (d->position + centerMarginY)) {
+        float yFront = d->position - (d->width / 2.0f);
+        float yBack = d->position + (d->width / 2.0f);
+
+        // Walkable doorway threshold ends before the rear hinge line
+        if (p->y >= yFront && p->y <= (yBack - 4.0f)) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, BOUNCE_IMPULSE_FORCE, 0.0f);
@@ -139,9 +141,11 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
       if (d->wall == WALL_RIGHT) {
-        float centerMarginY = (d->width / 2.0f) - 1.0f;
-        if (p->y >= (d->position - centerMarginY) &&
-            p->y <= (d->position + centerMarginY)) {
+        float yFront = d->position - (d->width / 2.0f);
+        float yBack = d->position + (d->width / 2.0f);
+
+        // Walkable doorway threshold ends before the rear hinge line
+        if (p->y >= yFront && p->y <= (yBack - 4.0f)) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, -BOUNCE_IMPULSE_FORCE, 0.0f);
