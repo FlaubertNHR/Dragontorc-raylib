@@ -1,18 +1,22 @@
 #include "projection.h"
 #include "config.h"
 
-float GetLeftWallX(float y, float roomWidth) {
-    (void)roomWidth;
-    float factorY = y / FIXED_VISUAL_DEPTH;
-    if (factorY < PROJECTION_MIN_FACTOR_Y) factorY = PROJECTION_MIN_FACTOR_Y;
-    if (factorY > 1.0f) factorY = 1.0f;
+float GetLeftWallX(float y, float roomWidth, float roomLength) {
+    // Distance from the actual back wall of the room (y = roomLength)
+    float depthFromRoomBack = roomLength - y;
+    if (depthFromRoomBack < 0.0f) depthFromRoomBack = 0.0f;
 
-    return PROJECTION_LEFT_FRONT_X + (PROJECTION_LEFT_BACK_X - PROJECTION_LEFT_FRONT_X) * factorY;
+    float halfWidth = roomWidth * 0.5f;
+
+    // At the back wall (y = roomLength): depthFromRoomBack = 0.0
+    // leftWallX = -halfWidth (-120.0)
+    // rightWallX = +halfWidth (+120.0)
+    // Total width at the back wall = 240.0 EXACT UNITS
+    return -halfWidth - (SIDE_WALL_INCLINATION_SLOPE * depthFromRoomBack);
 }
 
-float GetRightWallX(float y, float roomWidth) {
-    float leftX = GetLeftWallX(y, roomWidth);
-    return roomWidth - leftX;
+float GetRightWallX(float y, float roomWidth, float roomLength) {
+    return -GetLeftWallX(y, roomWidth, roomLength);
 }
 
 Vector2 ProjectRoomPoint(float x, float y, float roomWidth) {

@@ -20,10 +20,10 @@
 #define TILE_SIZE                  64.0f
 #define FIXED_VISUAL_DEPTH         350.0f
 
-// Inclination of the side walls (2.5D trapezoidal perspective)
-#define PROJECTION_LEFT_FRONT_X    -575.0f // Angle= arctan((PROJECTION_LEFT_BACK_X - PROJECTION_LEFT_FRONT_X)/varY)
-#define PROJECTION_LEFT_BACK_X     -200.0f  // where  VarY= FIXED_VISUAL_DEPTH * PROJECTION_Y_FACTOR
-#define PROJECTION_Y_FACTOR        0.54f  // Perspective compressión factor; i.e. from how high you look at the floor 
+// Inclination slope of the side walls (2.5D trapezoidal perspective)
+// Preserves the exact original wall angle (375 / 350)
+#define SIDE_WALL_INCLINATION_SLOPE   1.07142857f
+#define PROJECTION_Y_FACTOR        0.54f  // Perspective compression factor; i.e. from how high you look at the floor 
                                           // 0: no floor seen; 1: cenital view
 #define PROJECTION_SCALE           1.3f
 #define PROJECTION_MIN_FACTOR_Y    0.0f
@@ -32,7 +32,7 @@
 #define CAMERA_VIEWPORT_CENTER_Y_RATIO 0.81f
 
 // Player initial state
-#define INITIAL_PLAYER_X           180.0f
+#define INITIAL_PLAYER_X           0.0f
 #define INITIAL_PLAYER_Y           40.0f
 
 // Player movement and physics
@@ -63,7 +63,7 @@
 #define SERVANT_HEAD_OFFSET        30.0f
 
 // Door transitions & collision thresholds
-#define SIDE_WALL_DETECTION_MARGIN     0.0f   // ¿8?
+#define SIDE_WALL_DETECTION_MARGIN     0.0f   // 8
 #define DOOR_TRANSITION_STEP_X         8.0f  // 2?
 #define WALL_BOUNCE_IMPULSE_FORCE      50.0f
 #define DOOR_TRIGGER_THRESHOLD_SIDE    3.0f

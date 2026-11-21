@@ -44,10 +44,10 @@ void DrawDecorativeFrame(const Game *game) {
 }
 
 void DrawFloorGrid(const Room *room, Vector2 scroll) {
-  float leftFrontX = GetLeftWallX(0.0f, room->width);
-  float leftBackX = GetLeftWallX(room->length, room->width);
-  float rightFrontX = GetRightWallX(0.0f, room->width);
-  float rightBackX = GetRightWallX(room->length, room->width);
+  float leftFrontX = GetLeftWallX(0.0f, room->width, room->length);
+  float leftBackX = GetLeftWallX(room->length, room->width, room->length);
+  float rightFrontX = GetRightWallX(0.0f, room->width, room->length);
+  float rightBackX = GetRightWallX(room->length, room->width, room->length);
 
   for (float x = 0; x <= room->width; x += TILE_SIZE) {
     float t = (room->width > 0.0f) ? (x / room->width) : 0.0f;
@@ -61,8 +61,8 @@ void DrawFloorGrid(const Room *room, Vector2 scroll) {
   }
 
   for (float y = 0; y <= room->length; y += TILE_SIZE) {
-    float xLeft = GetLeftWallX(y, room->width);
-    float xRight = GetRightWallX(y, room->width);
+    float xLeft = GetLeftWallX(y, room->width, room->length);
+    float xRight = GetRightWallX(y, room->width, room->length);
     Vector2 p1 = ProjectRoomPoint(xLeft, y, room->width);
     Vector2 p2 = ProjectRoomPoint(xRight, y, room->width);
     DrawLine(p1.x + scroll.x, p1.y + scroll.y, p2.x + scroll.x, p2.y + scroll.y,
@@ -71,10 +71,10 @@ void DrawFloorGrid(const Room *room, Vector2 scroll) {
 }
 
 void DrawWalls(const Room *room, Vector2 scroll) {
-  float leftFrontX = GetLeftWallX(0.0f, room->width);
-  float leftBackX = GetLeftWallX(room->length, room->width);
-  float rightFrontX = GetRightWallX(0.0f, room->width);
-  float rightBackX = GetRightWallX(room->length, room->width);
+  float leftFrontX = GetLeftWallX(0.0f, room->width, room->length);
+  float leftBackX = GetLeftWallX(room->length, room->width, room->length);
+  float rightFrontX = GetRightWallX(0.0f, room->width, room->length);
+  float rightBackX = GetRightWallX(room->length, room->width, room->length);
 
   Vector2 leftBottom = ProjectRoomPoint(leftFrontX, 0.0f, room->width);
   Vector2 leftTop = ProjectRoomPoint(leftBackX, room->length, room->width);
@@ -191,8 +191,8 @@ static void DrawBackDoorLeaf(const Door *door, const Room *room,
 static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
   float yFront = door->position - (door->width / 2.0f);
   float yBack = door->position + (door->width / 2.0f);
-  float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width) : GetRightWallX(yFront, room->width);
-  float xWallBack  = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width)  : GetRightWallX(yBack, room->width);
+  float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width, room->length) : GetRightWallX(yFront, room->width, room->length);
+  float xWallBack  = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width, room->length)  : GetRightWallX(yBack, room->width, room->length);
 
   Vector2 baseFront = ProjectRoomPoint(xWallFront, yFront, room->width);
   Vector2 baseBack = ProjectRoomPoint(xWallBack, yBack, room->width);
@@ -305,14 +305,14 @@ static bool IsDoorInFrontOfPlayer(const Door *door, const Room *room,
   float leafReachX = door->height * 1.2f;
 
   if (door->wall == WALL_LEFT) {
-    // Player is deeper in the room than the door's front edge
     bool playerDeeperThanDoor = (player->y >= yFront - 4.0f);
-    // Player is close enough to the left wall to be occluded by the door structure
-    bool playerNearLeftWall = (player->x >= 0.0f && player->x <= leafReachX);
+    float leftWallX = GetLeftWallX(player->y, room->width, room->length);
+    bool playerNearLeftWall = (player->x >= (leftWallX - 10.0f) && player->x <= (leftWallX + leafReachX));
     return (playerDeeperThanDoor && playerNearLeftWall);
   } else if (door->wall == WALL_RIGHT) {
     bool playerDeeperThanDoor = (player->y >= yFront - 4.0f);
-    bool playerNearRightWall = (player->x >= (room->width - leafReachX) && player->x <= room->width);
+    float rightWallX = GetRightWallX(player->y, room->width, room->length);
+    bool playerNearRightWall = (player->x <= (rightWallX + 10.0f) && player->x >= (rightWallX - leafReachX));
     return (playerDeeperThanDoor && playerNearRightWall);
   }
 
@@ -334,8 +334,8 @@ static bool IsLeafInFrontOfPlayer(const Door *door, const Room *room,
   float yBack = door->position + (door->width / 2.0f);
   float leafSpan = door->height * 0.75f;
 
-  float leftWallX  = GetLeftWallX(player->y, room->width);
-  float rightWallX = GetRightWallX(player->y, room->width);
+  float leftWallX  = GetLeftWallX(player->y, room->width, room->length);
+  float rightWallX = GetRightWallX(player->y, room->width, room->length);
 
   if (door->wall == WALL_LEFT) {
     bool behindInY = (player->y > yBack);
@@ -457,21 +457,37 @@ static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
   }
 }
 void DrawRoomItems(const Room *room, Vector2 scroll) {
-  for (int i = 0; i < room->itemCount; i++) {
+for (int i = 0; i < room->itemCount; i++) {
     const Item *item = &room->items[i];
     if (!item->active)
       continue;
 
-    Vector2 itemScreen = ProjectRoomPoint(item->x, item->y, room->width);
-    itemScreen.x += scroll.x;
-    itemScreen.y += scroll.y;
+    Vector2 itemBaseScreen;
+    if (item->isWallItem) {
+      if (item->wall == WALL_BACK) {
+        // Base anchor point is projected directly on the back wall floor line
+        itemBaseScreen = ProjectRoomPoint(item->x, room->length, room->width);
+      } else if (item->wall == WALL_LEFT) {
+        float wallX = GetLeftWallX(item->y, room->width, room->length);
+        itemBaseScreen = ProjectRoomPoint(wallX, item->y, room->width);
+      } else { // WALL_RIGHT
+        float wallX = GetRightWallX(item->y, room->width, room->length);
+        itemBaseScreen = ProjectRoomPoint(wallX, item->y, room->width);
+      }
+    } else {
+      itemBaseScreen = ProjectRoomPoint(item->x, item->y, room->width);
+    }
+    itemBaseScreen.x += scroll.x;
+    itemBaseScreen.y += scroll.y;
 
     if (item->isWallItem) {
-      DrawRectangle(itemScreen.x - 6, itemScreen.y - 40, 12, 12, item->color);
-      DrawRectangleLines(itemScreen.x - 6, itemScreen.y - 40, 12, 12, GOLD);
+      // Elevation is measured vertically above the corresponding wall floor line
+      float drawY = itemBaseScreen.y - item->wallHeightOffset;
+      DrawRectangle(itemBaseScreen.x - 6, drawY - 6, 12, 12, item->color);
+      DrawRectangleLines(itemBaseScreen.x - 6, drawY - 6, 12, 12, GOLD);
     } else {
-      DrawCircleV(itemScreen, 6.0f, item->color);
-      DrawCircleLines((int)itemScreen.x, (int)itemScreen.y, 6.5f, WHITE);
+      DrawCircleV(itemBaseScreen, 6.0f, item->color);
+      DrawCircleLines((int)itemBaseScreen.x, (int)itemBaseScreen.y, 6.5f, WHITE);
     }
   }
 }

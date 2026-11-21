@@ -75,11 +75,11 @@ void TransitionToRoom(Game *game, const Door *crossedDoor) {
     Door *dest = &nextRoom->doors[i];
     if (dest->id == targetDoorId) {
       if (dest->wall == WALL_LEFT) {
-        float leftWall = GetLeftWallX(dest->position, nextRoom->width);
+        float leftWall = GetLeftWallX(dest->position, nextRoom->width, nextRoom->length);
         game->player.x = leftWall + DOOR_TRANSITION_STEP_X; // A step inward
         game->player.y = dest->position;
       } else if (dest->wall == WALL_RIGHT) {
-        float rightWall = GetRightWallX(dest->position, nextRoom->width);
+        float rightWall = GetRightWallX(dest->position, nextRoom->width, nextRoom->length);
         game->player.x = rightWall - DOOR_TRANSITION_STEP_X;
         game->player.y = dest->position;
       } else if (dest->wall == WALL_BACK) {
@@ -101,8 +101,8 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   bool hasChangedRoom = false;
   Door crossedDoor;
 
-  float leftWallX = GetLeftWallX(p->y, r->width);
-  float rightWallX = GetRightWallX(p->y, r->width);
+  float leftWallX = GetLeftWallX(p->y, r->width, r->length);
+  float rightWallX = GetRightWallX(p->y, r->width, r->length);
 
   const float shadowRadiusX = SHADOW_LOGIC_RADIUS_X;
   const float shadowRadiusY = SHADOW_LOGIC_RADIUS_Y;
@@ -211,7 +211,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         float leafY = d->position + (d->width / 2.0f);
         const float shadowFloorY = SHADOW_RADIUS_Y / 1.55f;
 
-        float wallX = (d->wall == WALL_LEFT) ? GetLeftWallX(leafY, r->width) : GetRightWallX(leafY, r->width);
+        float wallX = (d->wall == WALL_LEFT) ? GetLeftWallX(leafY, r->width, r->length) : GetRightWallX(leafY, r->width, r->length);
         Vector2 rearBase = ProjectRoomPoint(wallX, leafY, r->width);
         rearBase.x += game->cameraScroll.x;
 
@@ -248,7 +248,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         float leafY = d->position + (d->width / 2.0f);
         const float shadowFloorY = SHADOW_RADIUS_Y / 1.55f;
 
-        float wallX = (d->wall == WALL_LEFT) ? GetLeftWallX(leafY, r->width) : GetRightWallX(leafY, r->width);
+        float wallX = (d->wall == WALL_LEFT) ? GetLeftWallX(leafY, r->width, r->length) : GetRightWallX(leafY, r->width, r->length);
         Vector2 rearBase = ProjectRoomPoint(wallX, leafY, r->width);
         rearBase.x += game->cameraScroll.x;
 
@@ -407,14 +407,14 @@ void UpdateServantPhysics(Game *game, float dt) {
       s->screenY = SCREEN_HEIGHT - screenPadding;
 
     // 4. Vertical limits: front room floor threshold and top of the back wall
-    Vector2 frontFloorCenter = ProjectRoomPoint(r->width * 0.5f, 4.0f, r->width);
+    Vector2 frontFloorCenter = ProjectRoomPoint(0.0f, 4.0f, r->width);
     float maxScreenBottom = frontFloorCenter.y + game->cameraScroll.y;
     if (s->screenY > maxScreenBottom) {
       s->screenY = maxScreenBottom;
     }
 
     Vector2 backWallBase =
-        ProjectRoomPoint(r->width * 0.5f, r->length, r->width);
+        ProjectRoomPoint(0.0f, r->length, r->width);
     float minScreenTop =
         (backWallBase.y - r->wallHeight) + game->cameraScroll.y;
     if (s->screenY < minScreenTop) {
@@ -422,8 +422,8 @@ void UpdateServantPhysics(Game *game, float dt) {
     }
 
     // 5 Horizontal limits
-    float leftFrontX = GetLeftWallX(0.0f, r->width);
-    float rightFrontX = GetRightWallX(0.0f, r->width);
+    float leftFrontX = GetLeftWallX(0.0f, r->width, r->length);
+    float rightFrontX = GetRightWallX(0.0f, r->width, r->length);
     Vector2 leftFrontCorner = ProjectRoomPoint(leftFrontX, 0.0f, r->width);
     Vector2 rightFrontCorner = ProjectRoomPoint(rightFrontX, 0.0f, r->width);
 
@@ -444,21 +444,21 @@ void UpdateServantPhysics(Game *game, float dt) {
       localY = r->length;
     s->y = localY;
 
-    float screenLeftLimit = GetLeftWallX(s->y, r->width) * PROJECTION_SCALE;
-    float screenRightLimit = GetRightWallX(s->y, r->width) * PROJECTION_SCALE;
+    float screenLeftLimit = GetLeftWallX(s->y, r->width, r->length) * PROJECTION_SCALE;
+    float screenRightLimit = GetRightWallX(s->y, r->width, r->length) * PROJECTION_SCALE;
 
     float visibleRoomWidth = screenRightLimit - screenLeftLimit;
     float localScreenX = s->screenX - game->cameraScroll.x;
 
     if (visibleRoomWidth > 0.0f) {
       float factorX = (localScreenX - screenLeftLimit) / visibleRoomWidth;
-      s->x = GetLeftWallX(s->y, r->width) + factorX * (GetRightWallX(s->y, r->width) - GetLeftWallX(s->y, r->width));
+      s->x = GetLeftWallX(s->y, r->width, r->length) + factorX * (GetRightWallX(s->y, r->width, r->length) - GetLeftWallX(s->y, r->width, r->length));
     }
 
     // Clamp logical coordinates to valid floor ground so dropping an item
     // always lands strictly inside the playable room scenario
-    float minX = GetLeftWallX(s->y, r->width) + 4.0f;
-    float maxX = GetRightWallX(s->y, r->width) - 4.0f;
+    float minX = GetLeftWallX(s->y, r->width, r->length) + 4.0f;
+    float maxX = GetRightWallX(s->y, r->width, r->length) - 4.0f;
     if (s->x < minX)
       s->x = minX;
     if (s->x > maxX)
@@ -470,8 +470,8 @@ static Vector2 GetSideDoorHandleScreenPos(const Door *door, const Room *room,
                                           Vector2 cameraScroll) {
   float yFront = door->position - (door->width / 2.0f);
   float yBack = door->position + (door->width / 2.0f);
-  float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width) : GetRightWallX(yFront, room->width);
-  float xWallBack = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width) : GetRightWallX(yBack, room->width);
+  float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width, room->length) : GetRightWallX(yFront, room->width, room->length);
+  float xWallBack = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width, room->length) : GetRightWallX(yBack, room->width, room->length);
 
   Vector2 baseFront = ProjectRoomPoint(xWallFront, yFront, room->width);
   Vector2 baseBack = ProjectRoomPoint(xWallBack, yBack, room->width);
