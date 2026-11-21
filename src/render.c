@@ -339,12 +339,12 @@ static bool IsLeafInFrontOfPlayer(const Door *door, const Room *room,
 
   if (door->wall == WALL_LEFT) {
     bool behindInY = (player->y > (yBack - 4.0f));
-    bool nearWallX = (player->x >= (leftWallX - 20.0f) &&
+    bool nearWallX = (player->x >= (leftWallX - 30.0f) &&
                       player->x <= (leftWallX + leafSpan + 30.0f));
     return (behindInY && nearWallX);
   } else if (door->wall == WALL_RIGHT) {
     bool behindInY = (player->y > (yBack - 4.0f));
-    bool nearWallX = (player->x <= (rightWallX + 20.0f) &&
+    bool nearWallX = (player->x <= (rightWallX + 30.0f) &&
                       player->x >= (rightWallX - leafSpan - 30.0f));
     return (behindInY && nearWallX);
   }
@@ -357,14 +357,12 @@ void DrawDoorsBehind(const Room *room, const Player *player, Vector2 scroll) {
     const Door *door = &room->doors[i];
 
     if (door->wall == WALL_BACK) {
-      // The black void in the background is ALWAYS drawn behind the player
       DrawBackDoorHole(door, room, scroll);
-      // If the leaf is not in front, it is drawn here
       if (!IsLeafInFrontOfPlayer(door, room, player)) {
         DrawBackDoorLeaf(door, room, scroll);
       }
     } else {
-      // For sides, if it is not in front, it is drawn in its entirety
+      // The wall frame/hole stays behind the player
       if (!IsLeafInFrontOfPlayer(door, room, player)) {
         DrawSideDoor(door, room, scroll);
       }
@@ -378,9 +376,9 @@ void DrawDoorsInFront(const Room *room, const Player *player, Vector2 scroll) {
 
     if (IsLeafInFrontOfPlayer(door, room, player)) {
       if (door->wall == WALL_BACK) {
-        // Only draw the wooden board, NEVER the black rectangle
         DrawBackDoorLeaf(door, room, scroll);
       } else {
+        // ONLY the open wooden panel is drawn over the player
         DrawSideDoor(door, room, scroll);
       }
     }

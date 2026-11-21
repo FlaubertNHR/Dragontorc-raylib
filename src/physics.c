@@ -104,8 +104,11 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   float leftWallX = GetLeftWallX(p->y, r->width);
   float rightWallX = GetRightWallX(p->y, r->width);
 
+  const float shadowRadiusX = SHADOW_LOGIC_RADIUS_X;
+  const float shadowRadiusY = SHADOW_LOGIC_RADIUS_Y;
+
   // --- 1. LEFT WALL COLLISION ---
-  if (p->x < (leftWallX + SIDE_WALL_DETECTION_MARGIN)) {
+  if ((p->x - shadowRadiusX) < (leftWallX + SIDE_WALL_DETECTION_MARGIN)) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
@@ -118,7 +121,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, BOUNCE_IMPULSE_FORCE, 0.0f);
-            p->x = leftWallX;
+            p->x = leftWallX + shadowRadiusX;
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -131,12 +134,12 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway && p->x < leftWallX)
-      p->x = leftWallX;
+    if (!insideDoorway && (p->x - shadowRadiusX) < leftWallX)
+      p->x = leftWallX + shadowRadiusX;
   }
 
   // --- 2. RIGHT WALL COLLISION ---
-  if (p->x > (rightWallX - SIDE_WALL_DETECTION_MARGIN) && !hasChangedRoom) {
+  if ((p->x + shadowRadiusX) > (rightWallX - SIDE_WALL_DETECTION_MARGIN) && !hasChangedRoom) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
@@ -149,7 +152,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, -BOUNCE_IMPULSE_FORCE, 0.0f);
-            p->x = rightWallX;
+            p->x = rightWallX - shadowRadiusX;
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -162,12 +165,12 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway && p->x > rightWallX)
-      p->x = rightWallX;
+    if (!insideDoorway && (p->x + shadowRadiusX) > rightWallX)
+      p->x = rightWallX - shadowRadiusX;
   }
 
   // --- 3. BACK WALL COLLISION ---
-  if (p->y > r->length && !hasChangedRoom) {
+  if ((p->y + shadowRadiusY) > r->length && !hasChangedRoom) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
@@ -178,7 +181,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             ApplyBounce(p, 0.0f, -BOUNCE_IMPULSE_FORCE);
-            p->y = r->length;
+            p->y = r->length - shadowRadiusY; 
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -191,8 +194,8 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway)
-      p->y = r->length;
+    if (!insideDoorway && (p->y + shadowRadiusY) > r->length)
+      p->y = r->length - shadowRadiusY;
   }
 
   // --- 4. BLOCK SIDE DOORS IF PASSING FROM BELOW (moveY > 0) ---
@@ -331,8 +334,8 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   }
 
   // --- 8. FRONT ROOM BOUNDARY COLLISION ---
-  if (p->y < 0.0f) {
-    p->y = 0.0f;
+  if ((p->y - shadowRadiusY) < 0.0f) {
+    p->y = shadowRadiusY;
   }
 
   // --- 9. TRIGGER ROOM SWITCH ---

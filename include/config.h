@@ -52,8 +52,8 @@
 #define SHADOW_RADIUS_X            16.0f // 36
 #define SHADOW_RADIUS_Y            8.0f   // 6
 
-#define SHADOW_LOGIC_RADIUS_Y      (SHADOW_RADIUS_Y / 1.55f)
-#define SHADOW_LOGIC_RADIUS_X      (SHADOW_RADIUS_X * 0.75f)
+#define SHADOW_LOGIC_RADIUS_Y      (SHADOW_RADIUS_Y / (PROJECTION_Y_FACTOR * PROJECTION_SCALE))
+#define SHADOW_LOGIC_RADIUS_X      (SHADOW_RADIUS_X / PROJECTION_SCALE)
 
 #define LEVITATION_SPEED           4.0f // Bobbing frequency
 #define LEVITATION_AMPLITUDE       3.5f
