@@ -3,10 +3,11 @@
 #include "projection.h"
 #include <math.h>
 
-void ApplyBounce(Player *player, float forceX, float forceY) {
-  player->bounceForceX = forceX;
-  player->bounceForceY = forceY;
-  player->bounceLockoutTimer = BOUNCE_LOCKOUT_TIME;
+void ApplyBounce(Player *player, float dirX, float dirY) {
+  player->lastDirX = dirX;
+  player->lastDirY = dirY;
+  player->moveRamp = 1.0f;                          // Inicia al máximo de inercia y elevación
+  player->bounceLockoutTimer = BOUNCE_LOCKOUT_TIME; // Bloqueo temporal breve para iniciar el retroceso
 }
 
 void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
@@ -18,71 +19,57 @@ void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
 
   float pixelsPerLogicalUnit = PROJECTION_SCALE;
 
-  // If we are in the midst of a rebound following a collision
+  // 1. Reading keyboard input
   if (p->bounceLockoutTimer > 0.0f) {
     p->bounceLockoutTimer -= dt;
-
-    float bounceStepX = 0.0f;
-    if (pixelsPerLogicalUnit > 0.0f) {
-      bounceStepX = (p->bounceForceX * dt) / pixelsPerLogicalUnit;
-    }
-
-    p->x += bounceStepX;
-    p->y += p->bounceForceY * dt;
-
-    p->bounceForceX *= BOUNCE_FRICTION;
-    p->bounceForceY *= BOUNCE_FRICTION;
+    // Durante el lockout no leemos teclado para dar prioridad al inicio del retroceso
   } else {
-    // 1. Reading keyboard input
     if (IsKeyDown(KEY_RIGHT)) moveX += 1.0f;
     if (IsKeyDown(KEY_LEFT)) moveX -= 1.0f;
     if (IsKeyDown(KEY_UP)) moveY += 1.0f;
     if (IsKeyDown(KEY_DOWN)) moveY -= 1.0f;
+  }
 
-    bool isMovingInput = (moveX != 0.0f || moveY != 0.0f);
-    float dirX = 0.0f;
-    float dirY = 0.0f;
+  bool isMovingInput = (moveX != 0.0f || moveY != 0.0f);
+  float dirX = 0.0f;
+  float dirY = 0.0f;
 
-    // 2. Computing Acceleration Ramp (Takeoff / Landing)
-    if (isMovingInput) {
-      // Normalization of the input address
-      if (moveX != 0.0f && moveY != 0.0f) {
-        moveX *= DIAGONAL_FACTOR_X;
-      }
-      float length = sqrtf(moveX * moveX + moveY * moveY);
-      dirX = moveX / length;
-      dirY = moveY / length;
-
-      // Store the active direction for inertia
-      p->lastDirX = dirX;
-      p->lastDirY = dirY;
-
-      // Increase acceleration and takeoff ramp
-      p->moveRamp += dt / ACCELERATION_TIME;
-      if (p->moveRamp > 1.0f) p->moveRamp = 1.0f;
-    } else {
-      p->moveRamp -= dt / DECELERATION_TIME;
-      if (p->moveRamp < 0.0f) p->moveRamp = 0.0f;
-
-      // We use the last direction to maintain momentum when keys are released
-      dirX = p->lastDirX;
-      dirY = p->lastDirY;
+  // 2. Computing Acceleration Ramp (Takeoff / Landing)
+  if (isMovingInput) {
+    if (moveX != 0.0f && moveY != 0.0f) {
+      moveX *= DIAGONAL_FACTOR_X;
     }
+    float length = sqrtf(moveX * moveX + moveY * moveY);
+    dirX = moveX / length;
+    dirY = moveY / length;
 
-    // 3. Harmonic elevation modulated by the ramp (gradually decreases to 0 during deceleration)
-    p->levitationTimer += dt * LEVITATION_SPEED;
-    float targetAltitude = PLAYER_BASE_Z + sinf(p->levitationTimer) * LEVITATION_AMPLITUDE;
-    p->floatingOffset = targetAltitude * p->moveRamp;
+    p->lastDirX = dirX;
+    p->lastDirY = dirY;
 
-    // 4. Inertial coasting while the ramp value is greater than 0
-    if (p->moveRamp > 0.0f && (dirX != 0.0f || dirY != 0.0f)) {
-      float effectiveSpeed = p->speed * p->moveRamp;
-      float stepX = (dirX * (effectiveSpeed * SPEED_MULTIPLIER_X) * dt) / pixelsPerLogicalUnit;
-      float stepY = dirY * effectiveSpeed * dt;
+    p->moveRamp += dt / ACCELERATION_TIME;
+    if (p->moveRamp > 1.0f) p->moveRamp = 1.0f;
+  } else {
+    p->moveRamp -= dt / DECELERATION_TIME;
+    if (p->moveRamp < 0.0f) p->moveRamp = 0.0f;
 
-      p->x += stepX;
-      p->y += stepY;
-    }
+    // We use the last direction to maintain momentum when keys are released
+    dirX = p->lastDirX;
+    dirY = p->lastDirY;
+  }
+
+  // 3. Harmonic elevation modulated by the ramp (gradually decreases to 0 during deceleration)
+  p->levitationTimer += dt * LEVITATION_SPEED;
+  float targetAltitude = PLAYER_BASE_Z + sinf(p->levitationTimer) * LEVITATION_AMPLITUDE;
+  p->floatingOffset = targetAltitude * p->moveRamp;
+
+  // 4. Inertial coasting while the ramp value is greater than 0
+  if (p->moveRamp > 0.0f && (dirX != 0.0f || dirY != 0.0f)) {
+    float effectiveSpeed = p->speed * p->moveRamp;
+    float stepX = (dirX * (effectiveSpeed * SPEED_MULTIPLIER_X) * dt) / pixelsPerLogicalUnit;
+    float stepY = dirY * effectiveSpeed * dt;
+
+    p->x += stepX;
+    p->y += stepY;
   }
   // Return the vector containing the inertia component for collisions with doors
   *outMoveX = (p->moveRamp > 0.0f) ? p->lastDirX * p->moveRamp : 0.0f;
@@ -150,8 +137,9 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         if (p->y >= yFront && p->y <= yBack) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
-            ApplyBounce(p, BOUNCE_IMPULSE_FORCE, 0.0f);
             p->x = leftWallX + shadowRadiusX;
+
+            ApplyBounce(p, 1.0f, 0.0f);
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -181,8 +169,9 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         if (p->y >= yFront && p->y <= yBack) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
-            ApplyBounce(p, -BOUNCE_IMPULSE_FORCE, 0.0f);
             p->x = rightWallX - shadowRadiusX;
+
+            ApplyBounce(p, -1.0f, 0.0f);
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -210,8 +199,9 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
             p->x <= (d->position + centerMarginX)) {
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
-            ApplyBounce(p, 0.0f, -BOUNCE_IMPULSE_FORCE);
             p->y = r->length - shadowRadiusY;
+
+            ApplyBounce(p, 0.0f, -1.0f);
             insideDoorway = false;
           } else {
             insideDoorway = true;

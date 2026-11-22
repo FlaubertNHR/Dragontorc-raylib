@@ -47,7 +47,7 @@
 #define RESET_MOTION_ON_ROOM_TRANSITION   1
 
 // Bounce mechanics and collision damping
-#define BOUNCE_IMPULSE_FORCE       95.0f
+#define BOUNCE_IMPULSE_FORCE       160.0f
 #define BOUNCE_LOCKOUT_TIME        0.35f
 #define BOUNCE_FRICTION            0.85f
 
