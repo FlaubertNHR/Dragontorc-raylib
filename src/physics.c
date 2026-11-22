@@ -93,15 +93,15 @@ void TransitionToRoom(Game *game, const Door *crossedDoor) {
     if (dest->id == targetDoorId) {
       if (dest->wall == WALL_LEFT) {
         float leftWall = GetLeftWallX(dest->position, nextRoom->width, nextRoom->length);
-        game->player.x = leftWall + DOOR_TRANSITION_STEP_X; // A step inward
+        game->player.x = leftWall + DOOR_TRANSITION_MARGIN_X; // A step inward
         game->player.y = dest->position;
       } else if (dest->wall == WALL_RIGHT) {
         float rightWall = GetRightWallX(dest->position, nextRoom->width, nextRoom->length);
-        game->player.x = rightWall - DOOR_TRANSITION_STEP_X;
+        game->player.x = rightWall - DOOR_TRANSITION_MARGIN_X;
         game->player.y = dest->position;
       } else if (dest->wall == WALL_BACK) {
         game->player.x = dest->position;
-        game->player.y = nextRoom->length - DOOR_TRANSITION_BACK_MARGIN_Y;
+        game->player.y = nextRoom->length - DOOR_TRANSITION_MARGIN_Y;
       }
       break;
     }
@@ -229,7 +229,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
     if (!insideDoorway && (p->y + shadowRadiusY) > r->length) {
       p->y = r->length - shadowRadiusY;
       if (p->bounceLockoutTimer <= 0.0f) {
-        ApplyBounce(p, p->lastDirX, -p->lastDirY);
+        ApplyBounce(p, p->lastDirX * 0.5, -p->lastDirY);
       }
     }
   }
@@ -369,7 +369,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   if ((p->y - shadowRadiusY) < 0.0f) {
     p->y = shadowRadiusY;
     if (p->bounceLockoutTimer <= 0.0f) {
-      ApplyBounce(p, p->lastDirX, -p->lastDirY); // Rebote opuesto a la inercia de choque
+      ApplyBounce(p, p->lastDirX * 0.5, -p->lastDirY); // Rebote opuesto a la inercia de choque
     }
   }
 

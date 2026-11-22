@@ -38,7 +38,7 @@
 // Player movement and physics
 #define PLAYER_BASE_SPEED          220.0f
 #define SPEED_MULTIPLIER_X         1.0f
-#define DIAGONAL_FACTOR_X          0.55f
+#define DIAGONAL_FACTOR_X          0.54f
 #define ACCELERATION_TIME          0.52f
 #define DECELERATION_TIME          0.52f
 
@@ -49,7 +49,6 @@
 // Bounce mechanics and collision damping
 #define BOUNCE_IMPULSE_FORCE       160.0f
 #define BOUNCE_LOCKOUT_TIME        0.35f
-#define BOUNCE_FRICTION            0.85f
 
 // Floating / levitation aesthetics
 #define PLAYER_BASE_Z              24.0f
@@ -69,11 +68,11 @@
 #define SERVANT_HEAD_OFFSET        30.0f
 
 // Door transitions & collision thresholds
-#define DOOR_TRANSITION_STEP_X         8.0f  // 2?
-#define WALL_BOUNCE_IMPULSE_FORCE      50.0f
+#define DOOR_TRANSITION_MARGIN_X       8.0f 
+#define DOOR_TRANSITION_MARGIN_Y       20.0f
 #define DOOR_TRIGGER_THRESHOLD_SIDE    3.0f
 #define DOOR_TRIGGER_THRESHOLD_BACK    8.0f
-#define DOOR_TRANSITION_BACK_MARGIN_Y  30.0f
+
 
 // World capacity limits
 #define MAX_DOORS_PER_ROOM         6
