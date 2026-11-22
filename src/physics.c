@@ -138,8 +138,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             p->x = leftWallX + shadowRadiusX;
-
-            ApplyBounce(p, 1.0f, 0.0f);
+            ApplyBounce(p, -p->lastDirX, -p->lastDirY * 0.5);
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -152,8 +151,12 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway && (p->x - shadowRadiusX) < leftWallX)
+    if (!insideDoorway && (p->x - shadowRadiusX) < leftWallX) {
       p->x = leftWallX + shadowRadiusX;
+      if (p->bounceLockoutTimer <= 0.0f) {
+        ApplyBounce(p, -p->lastDirX, -p->lastDirY * 0.5);
+      }
+    }
   }
 
   // --- 2. RIGHT WALL COLLISION ---
@@ -170,8 +173,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             p->x = rightWallX - shadowRadiusX;
-
-            ApplyBounce(p, -1.0f, 0.0f);
+            ApplyBounce(p, -p->lastDirX, -p->lastDirY * 0.5);
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -184,8 +186,12 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway && (p->x + shadowRadiusX) > rightWallX)
+    if (!insideDoorway && (p->x + shadowRadiusX) > rightWallX) {
       p->x = rightWallX - shadowRadiusX;
+      if (p->bounceLockoutTimer <= 0.0f) {
+        ApplyBounce(p, -p->lastDirX, -p->lastDirY *0.5);
+      }
+    }
   }
 
   // --- 3. BACK WALL COLLISION ---
@@ -200,8 +206,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
           if (d->state == DOOR_CLOSED) {
             d->state = DOOR_OPENING;
             p->y = r->length - shadowRadiusY;
-
-            ApplyBounce(p, 0.0f, -1.0f);
+            ApplyBounce(p, -p->lastDirX, -p->lastDirY);
             insideDoorway = false;
           } else {
             insideDoorway = true;
@@ -214,8 +219,12 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         }
       }
     }
-    if (!insideDoorway && (p->y + shadowRadiusY) > r->length)
+    if (!insideDoorway && (p->y + shadowRadiusY) > r->length) {
       p->y = r->length - shadowRadiusY;
+      if (p->bounceLockoutTimer <= 0.0f) {
+        ApplyBounce(p, p->lastDirX, -p->lastDirY);
+      }
+    }
   }
 
   // --- 4. BLOCK SIDE DOORS IF PASSING FROM BELOW (moveY > 0) ---
@@ -352,6 +361,9 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   // --- 8. FRONT ROOM BOUNDARY COLLISION ---
   if ((p->y - shadowRadiusY) < 0.0f) {
     p->y = shadowRadiusY;
+    if (p->bounceLockoutTimer <= 0.0f) {
+      ApplyBounce(p, p->lastDirX, -p->lastDirY); // Rebote opuesto a la inercia de choque
+    }
   }
 
   // --- 9. TRIGGER ROOM SWITCH ---
