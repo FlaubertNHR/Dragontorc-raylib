@@ -63,7 +63,6 @@
 #define SERVANT_HEAD_OFFSET        30.0f
 
 // Door transitions & collision thresholds
-#define SIDE_WALL_DETECTION_MARGIN     0.0f   // 8
 #define DOOR_TRANSITION_STEP_X         8.0f  // 2?
 #define WALL_BOUNCE_IMPULSE_FORCE      50.0f
 #define DOOR_TRIGGER_THRESHOLD_SIDE    3.0f

@@ -108,7 +108,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   const float shadowRadiusY = SHADOW_LOGIC_RADIUS_Y;
 
   // --- 1. LEFT WALL COLLISION ---
-  if ((p->x - shadowRadiusX) < (leftWallX + SIDE_WALL_DETECTION_MARGIN)) {
+  if ((p->x - shadowRadiusX) < leftWallX) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
@@ -139,7 +139,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
   }
 
   // --- 2. RIGHT WALL COLLISION ---
-  if ((p->x + shadowRadiusX) > (rightWallX - SIDE_WALL_DETECTION_MARGIN) && !hasChangedRoom) {
+  if (((p->x + shadowRadiusX) > rightWallX) && !hasChangedRoom) {
     bool insideDoorway = false;
     for (int i = 0; i < r->doorCount; i++) {
       Door *d = &r->doors[i];
