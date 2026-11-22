@@ -36,9 +36,15 @@
 #define INITIAL_PLAYER_Y           40.0f
 
 // Player movement and physics
-#define PLAYER_BASE_SPEED          280.0f
+#define PLAYER_BASE_SPEED          220.0f
 #define SPEED_MULTIPLIER_X         1.0f
 #define DIAGONAL_FACTOR_X          0.55f
+#define ACCELERATION_TIME          0.52f
+#define DECELERATION_TIME          0.52f
+
+// 1 = Resets inertia and elevation when changing rooms (as in the 1985 original)
+// 0 = Maintains flight and continuous speed when passing through doorways
+#define RESET_MOTION_ON_ROOM_TRANSITION   1
 
 // Bounce mechanics and collision damping
 #define BOUNCE_IMPULSE_FORCE       95.0f

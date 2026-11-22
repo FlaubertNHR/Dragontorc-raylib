@@ -115,6 +115,10 @@ typedef struct {
 
     float levitationTimer;
     float floatingOffset;
+    float moveRamp;
+
+    float lastDirX;
+    float lastDirY;
 
     float bounceForceX;
     float bounceForceY;

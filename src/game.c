@@ -8,11 +8,15 @@
 static void InitPlayer(Player *p) {
   p->x = INITIAL_PLAYER_X;
   p->y = INITIAL_PLAYER_Y;
-  p->z = PLAYER_BASE_Z;
+  p->z = 0.0f;
   p->speed = PLAYER_BASE_SPEED;
 
   p->levitationTimer = 0.0f;
   p->floatingOffset = 0.0f;
+  p->moveRamp = 0.0f;
+
+  p->lastDirX = 0.0f;
+  p->lastDirY = 0.0f;
 
   p->bounceForceX = 0.0f;
   p->bounceForceY = 0.0f;
