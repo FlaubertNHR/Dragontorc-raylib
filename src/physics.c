@@ -4,10 +4,17 @@
 #include <math.h>
 
 void ApplyBounce(Player *player, float dirX, float dirY) {
+  float impactSpeed = player->moveRamp;
+  if (impactSpeed < 0.15f) {
+    player->moveRamp = 0.0f;
+    return;
+  }    
   player->lastDirX = dirX;
   player->lastDirY = dirY;
-  player->moveRamp = 1.0f;                          // Inicia al máximo de inercia y elevación
-  player->bounceLockoutTimer = BOUNCE_LOCKOUT_TIME; // Bloqueo temporal breve para iniciar el retroceso
+  // Momentum of the rebound begins in proportion to the speed at which you collided
+  player->moveRamp = impactSpeed;  
+  // Control-lockout duration scales in proportion to the shock intensity
+  player->bounceLockoutTimer = BOUNCE_LOCKOUT_TIME * impactSpeed;
 }
 
 void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
