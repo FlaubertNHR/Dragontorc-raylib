@@ -3,6 +3,7 @@
 
 // Debug Flags 
 #define DEBUG_HITBOX 0
+#define DEBUG_POSITIONS 0
 
 // Screen and display settings
 #define SCREEN_WIDTH               800

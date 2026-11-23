@@ -4,6 +4,38 @@
 #include "physics.h"
 #include "projection.h"
 #include "render.h"
+#include <stdio.h>
+
+#if DEBUG_POSITIONS
+static void DebugPrintPositions(const Game *game, float dt) {
+  static float debugTimer = 0.0f;
+  debugTimer += dt;
+
+  // Print twice per second (every 0.5s) to prevent terminal flooding
+  if (debugTimer >= 0.5f) {
+    debugTimer = 0.0f;
+
+    const Player *p = &game->player;
+    const Servant *s = &game->servant;
+
+    // Screen coordinates for Maroc's base/shadow
+    float marocScreenX = game->projectedPlayer.x + game->cameraScroll.x;
+    float marocScreenY = game->projectedPlayer.y + game->cameraScroll.y;
+
+    printf("\n==================== DEBUG POSITIONS ====================\n");
+    printf("[MAROC]   Logical: (X: %7.2f, Y: %7.2f, Alt: %5.2f) | Screen: (X: %6.1f, Y: %6.1f)\n",
+           p->x, p->y, p->z + p->floatingOffset, marocScreenX, marocScreenY);
+
+    if (s->active) {
+      printf("[SERVANT] Logical: (X: %7.2f, Y: %7.2f)            | Screen: (X: %6.1f, Y: %6.1f)\n",
+             s->x, s->y, s->screenX, s->screenY);
+    } else {
+      printf("[SERVANT] Status: INACTIVE\n");
+    }
+    printf("========================================================\n");
+  }
+}
+#endif
 
 static void InitPlayer(Player *p) {
   p->x = INITIAL_PLAYER_X;
@@ -113,7 +145,9 @@ void UpdateGame(Game *game) {
     UpdateServantDoorInteraction(game);
     UpdateServantItemInteraction(game, dt);
   }
-
+#if DEBUG_POSITIONS
+  DebugPrintPositions(game, dt);
+#endif
   UpdateGameCamera(game);
 }
 

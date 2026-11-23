@@ -400,7 +400,7 @@ void DrawPlayer(const Game *game) {
                 shadowPos.y - PLAYER_HEIGHT - totalAltitude, PLAYER_WIDTH,
                 PLAYER_HEIGHT, WHITE);
 
-#if DEBUG_HITBOX 
+#if DEBUG_HITBOX
   // --- VISUAL INDICATOR FOR THE EXCHANGE HITBOX (DEBUG) ---
   float bodyWidth = 20.0f;
   float bodyHeight = 14.0f;
@@ -413,7 +413,7 @@ void DrawPlayer(const Game *game) {
       marocBodyCenterY - (bodyHeight * 0.5f),
       bodyWidth,
       bodyHeight
-  };
+    };
 
   // Semi-transparent red box and yellow dot in the center of the torso
   DrawRectangleRec(hitBox, (Color){255, 0, 0, 110});
@@ -518,7 +518,6 @@ void DrawServant(const Servant *servant, float roomWidth, Vector2 cameraScroll,
                  const Game *game) {
   (void)roomWidth;
   (void)cameraScroll;
-  (void)game;
 
   if (!servant->active)
     return;
@@ -531,9 +530,21 @@ void DrawServant(const Servant *servant, float roomWidth, Vector2 cameraScroll,
   DrawCircleV((Vector2){servantCenter.x - 3, servantCenter.y - 2}, 1.5f, BLACK);
   DrawCircleV((Vector2){servantCenter.x + 3, servantCenter.y - 2}, 1.5f, BLACK);
 
-  // Render carried item floating attached right below servant
+  // Render carried item floating attached right below servant (clamped on front vertical line)
   if (servant->carriedItemId != 0 && servant->carriedItem.id != 0) {
-    Vector2 itemPos = {servantCenter.x, servantCenter.y + 14.0f};
+    const Room *r = &game->rooms[game->currentRoom];
+    const float marginPx = 8.0f; // Margen respecto a la pared
+
+    // 1. Computing of the front left and right exterior vertical lines
+    float minScreenX = (GetLeftWallX(0.0f, r->width, r->length) * PROJECTION_SCALE) + game->cameraScroll.x + marginPx;
+    float maxScreenX = (GetRightWallX(0.0f, r->width, r->length) * PROJECTION_SCALE) + game->cameraScroll.x - marginPx;
+
+    // 2. Clamping the object's X coordinate to the outer line
+    float itemScreenX = servant->screenX;
+    if (itemScreenX < minScreenX) itemScreenX = minScreenX;
+    if (itemScreenX > maxScreenX) itemScreenX = maxScreenX;
+
+    Vector2 itemPos = {itemScreenX, servantCenter.y + 14.0f};
     DrawItemSprite(servant->carriedItem.category, itemPos, 0.85f, servant->carriedItem.color);
   }
 }

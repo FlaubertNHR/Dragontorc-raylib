@@ -852,7 +852,7 @@ void StartServantItemDrop(Game *game) {
   if (s->carriedItemId == 0)
     return;
 
-  // 1. Find an available slot for the falling animation
+  // 1. Search for a free slot for the falling item animation
   int slot = -1;
   for (int i = 0; i < MAX_FALLING_ITEMS; i++) {
     if (!game->fallingItems[i].active) {
@@ -865,72 +865,79 @@ void StartServantItemDrop(Game *game) {
 
   FallingItem *fi = &game->fallingItems[slot];
 
-  float startX = s->screenX;
-  float startY = s->screenY + 14.0f; // Held just beneath the servant’s sphere
+  // 2. Initial screen position matching DrawServant visual clamping (frontmost vertical line)
+  const float marginPx = 8.0f;
+  float minScreenX = (GetLeftWallX(0.0f, r->width, r->length) * PROJECTION_SCALE) + game->cameraScroll.x + marginPx;
+  float maxScreenX = (GetRightWallX(0.0f, r->width, r->length) * PROJECTION_SCALE) + game->cameraScroll.x - marginPx;
 
-  // 2. Direct logical X-coordinate (NEVER MODIFIED OR CLAMPED IN X!)
+  float startX = s->screenX;
+  if (startX < minScreenX) startX = minScreenX;
+  if (startX > maxScreenX) startX = maxScreenX;
+
+  float startY = s->screenY + 14.0f; // Held right below servant's hands
+
+  // 3. Exact logical X coordinate for a 100% pure vertical drop line on screen
   float rawLogicalX = (startX - game->cameraScroll.x) / PROJECTION_SCALE;
   float targetLogicalX = rawLogicalX;
 
+  // 4. Initial target depth Y starting at servant's depth (s->y)
+  float targetLogicalY = s->y;
+
+  // 5. Geometric Y-depth calculation for side wall intersection
+  const float floorMarginX = 6.0f; // Clearance margin inside the side wall
   float halfWidth = r->width * 0.5f;
-  const float marginX = 10.0f;
-  const float backMarginY = 30.0f;
+
+  float leftWallAtY = GetLeftWallX(targetLogicalY, r->width, r->length) + floorMarginX;
+  float rightWallAtY = GetRightWallX(targetLogicalY, r->width, r->length) - floorMarginX;
+
+  if (rawLogicalX < leftWallAtY) {
+    // Over left wall: calculate forward Y-depth where left wall meets rawLogicalX
+    targetLogicalY = r->length - (-halfWidth + floorMarginX - rawLogicalX) / SIDE_WALL_INCLINATION_SLOPE;
+  } else if (rawLogicalX > rightWallAtY) {
+    // Over right wall: calculate forward Y-depth where right wall meets rawLogicalX
+    targetLogicalY = r->length - (rawLogicalX + floorMarginX - halfWidth) / SIDE_WALL_INCLINATION_SLOPE;
+  }
+
+  // 6. Random Y-offset dispersion cnverted from screen pixels to logical Y
+  // Random screen displacement between 15px and 65px downwards, uncompressed by PROJECTION_Y_FACTOR
+  float randomScreenOffsetPx = (float)GetRandomValue(15, 65);
+  float randomYOffsetLogical = randomScreenOffsetPx / (PROJECTION_Y_FACTOR * PROJECTION_SCALE);
+  targetLogicalY -= randomYOffsetLogical;
+
+  // Strict safety clamping for front & back wall boundaries.
+  // frontMarginY = 10.0f guarantees targetLogicalY NEVER reaches or exceeds y = 0.0f (front wall line)
+  const float backMarginY = 25.0f;
   const float frontMarginY = 10.0f;
 
-  // 3. Free fall on screen with random dispersion
-  float dropPx = 45.0f + (float)GetRandomValue(-25, 35);
-  float targetScreenY = startY + dropPx;
-
-  // Logical depth derived from screen position
-  float targetLogicalY = -(targetScreenY - game->cameraScroll.y) / (PROJECTION_Y_FACTOR * PROJECTION_SCALE);
-  targetLogicalY += (float)GetRandomValue(-15, 15);
-
-  float leftWallAtTarget = GetLeftWallX(targetLogicalY, r->width, r->length) + marginX;
-  float rightWallAtTarget = GetRightWallX(targetLogicalY, r->width, r->length) - marginX;
-
-  // 4. SIDE WALL GEOMETRY:
-  // If rawLogicalX lies on the left or right wall, we decrease the Y depth
-  // (moving toward the front of the room) to the precise point where the trapezoidal wall
-  // widens enough to accommodate rawLogicalX, without shifting its X position by even a single pixel.
-  if (rawLogicalX < leftWallAtTarget) {
-    // On the left wall: calculate the depth Y where the wall meets rawLogicalX
-    targetLogicalY = r->length - (-halfWidth + marginX - rawLogicalX) / SIDE_WALL_INCLINATION_SLOPE;
-  } else if (rawLogicalX > rightWallAtTarget) {
-    // On the right wall: calculate the depth Y where the wall meets rawLogicalX
-    targetLogicalY = r->length - (rawLogicalX + marginX - halfWidth) / SIDE_WALL_INCLINATION_SLOPE;
-  }
-
-  // 5. Y-axis depth clamping relative to the back and front of the room
-  if (targetLogicalY > (r->length - backMarginY)) {
-    targetLogicalY = r->length - backMarginY;
-  }
   if (targetLogicalY < frontMarginY) {
     targetLogicalY = frontMarginY;
   }
-
-  // 6. On-screen projection of the final landing point
-  Vector2 targetProj = ProjectRoomPoint(targetLogicalX, targetLogicalY, r->width);
-  float targetScreenX = startX;
-  float targetScreenYCalculated = targetProj.y + game->cameraScroll.y;
-
-  if (targetScreenYCalculated < startY + 20.0f) {
-    targetScreenYCalculated = startY + 20.0f;
+  if (targetLogicalY > (r->length - backMarginY)) {
+    targetLogicalY = r->length - backMarginY;
   }
 
-  // 7. State of the FallingItem structure (X strictly fixed at startX / rawLogicalX)
+  // 7. Computing target screen Y on the room floor (targetScreenX remains 100% equal to startX)
+  Vector2 targetProj = ProjectRoomPoint(targetLogicalX, targetLogicalY, r->width);
+  float targetScreenYCalculated = targetProj.y + game->cameraScroll.y;
+
+  if (targetScreenYCalculated < startY + 15.0f) {
+    targetScreenYCalculated = startY + 15.0f;
+  }
+
+  // 8. Populate falling item structure (vertical drop on screen)
   fi->active = true;
   fi->item = s->carriedItem;
   fi->startX = startX;
   fi->startY = startY;
-  fi->currentScreenX = startX;
+  fi->currentScreenX = startX;                    
   fi->currentScreenY = startY;
-  fi->targetScreenX = startX; // X remains strictly constant during the animation 
-  fi->targetScreenY = targetScreenYCalculated;
-  fi->targetLogicalX = targetLogicalX; // Exactly rawLogicalX (with no deviation)
-  fi->targetLogicalY = targetLogicalY;
+  fi->targetScreenX = startX;                     // ZERO X displacement
+  fi->targetScreenY = targetScreenYCalculated;     // Screen Y corresponding to randomized targetLogicalY
+  fi->targetLogicalX = targetLogicalX;            // Exact rawLogicalX
+  fi->targetLogicalY = targetLogicalY;            // Randomized Y depth (strictly >= 10.0f)
   fi->velocityY = 60.0f;
 
-  // Releases the object carried by the servant
+  // Release item from servant
   s->carriedItemId = 0;
   s->carriedItem = (Item){0};
 }
@@ -943,18 +950,19 @@ void UpdateFallingItems(Game *game, float dt) {
     if (!fi->active)
       continue;
 
-    // Gravitational acceleration along the Y-axis
+    // Gravity acceleration on screen Y
     fi->velocityY += 450.0f * dt;
     fi->currentScreenY += fi->velocityY * dt;
 
-    // The X remains strictly vertical (with no horizontal drift)
-    fi->currentScreenX = fi->targetScreenX;
+    // 100% constant vertical alignment on screen
+    fi->currentScreenX = fi->targetScreenX; // Always startX
 
-    // Upon reaching the ground
+    // Landing check on floor Y
     if (fi->currentScreenY >= fi->targetScreenY) {
       fi->currentScreenY = fi->targetScreenY;
+      fi->currentScreenX = fi->targetScreenX;
 
-      // Registers the object on the room floor at (targetLogicalX, targetLogicalY)
+      // Register item on room floor at (targetLogicalX, targetLogicalY)
       bool itemFoundInRoom = false;
       for (int i = 0; i < r->itemCount; i++) {
         if (r->items[i].id == fi->item.id) {
