@@ -640,29 +640,28 @@ void DrawFallingItems(const Game *game) {
     if (!fi->active)
       continue;
 
-    // 1. Fall progress (0.0 in the air -> 1.0 on the ground)
-    float startY = fi->targetScreenY - 45.0f;
-    float totalDist = fi->targetScreenY - startY;
-    float progress = 0.0f;
-    if (totalDist > 0.01f) {
-      progress = (fi->currentScreenY - startY) / totalDist;
-    }
-    if (progress < 0.0f) progress = 0.0f;
-    if (progress > 1.0f) progress = 1.0f;
-
-    // 2. Shadow cast on the floor of the room
+    // 1. Calculate dynamic camera-relative floor shadow position
     Vector2 shadowFloorProj = ProjectRoomPoint(fi->targetLogicalX, fi->targetLogicalY, game->rooms[game->currentRoom].width);
     float shadowScreenX = shadowFloorProj.x + game->cameraScroll.x;
     float shadowScreenY = shadowFloorProj.y + game->cameraScroll.y;
 
+    // 2. Fall progress (0.0 in air -> 1.0 on floor ground)
+    float progress = 1.0f;
+    if (fi->startY > 0.01f) {
+      progress = 1.0f - (fi->currentScreenY / fi->startY);
+    }
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
+    // 3. Shadow expanding & darkening as item approaches floor
     float shadowRadiusX = 4.0f + progress * 3.5f;
     float shadowRadiusY = (4.0f + progress * 3.5f) * 0.5f;
-    unsigned char alpha = (unsigned char)(30 + progress * 80);
+    unsigned char alpha = (unsigned char)(30 + progress * 55);
     DrawEllipse((int)shadowScreenX, (int)shadowScreenY,
-                shadowRadiusX, shadowRadiusY, (Color){255, 255, 255, 85});
+                shadowRadiusX, shadowRadiusY, (Color){255, 255, 255, alpha});
 
-    // 3. The sprite falls at the exact vertical position on the screen (currentScreenX)
-    Vector2 spritePos = {fi->currentScreenX, fi->currentScreenY};
+    // 4. Sprite is rendered dynamically relative to cameraScroll, floating currentScreenY pixels above shadow
+    Vector2 spritePos = {shadowScreenX, shadowScreenY - fi->currentScreenY};
     DrawItemSprite(fi->item.category, spritePos, 0.85f, fi->item.color);
   }
 }

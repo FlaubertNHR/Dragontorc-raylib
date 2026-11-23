@@ -916,26 +916,23 @@ void StartServantItemDrop(Game *game) {
     targetLogicalY = r->length - backMarginY;
   }
 
-  // 7. Computing target screen Y on the room floor (targetScreenX remains 100% equal to startX)
+  // 7. Calculate floor shadow Y at release time to compute initial height above floor
   Vector2 targetProj = ProjectRoomPoint(targetLogicalX, targetLogicalY, r->width);
   float targetScreenYCalculated = targetProj.y + game->cameraScroll.y;
 
-  if (targetScreenYCalculated < startY + 15.0f) {
-    targetScreenYCalculated = startY + 15.0f;
+  float initialHeight = targetScreenYCalculated - startY;
+  if (initialHeight < 20.0f) {
+    initialHeight = 20.0f;
   }
 
-  // 8. Populate falling item structure (vertical drop on screen)
+  // 8. Populate falling item structure (anchored to room world coordinates)
   fi->active = true;
   fi->item = s->carriedItem;
-  fi->startX = startX;
-  fi->startY = startY;
-  fi->currentScreenX = startX;                    
-  fi->currentScreenY = startY;
-  fi->targetScreenX = startX;                     // ZERO X displacement
-  fi->targetScreenY = targetScreenYCalculated;     // Screen Y corresponding to randomized targetLogicalY
-  fi->targetLogicalX = targetLogicalX;            // Exact rawLogicalX
-  fi->targetLogicalY = targetLogicalY;            // Randomized Y depth (strictly >= 10.0f)
-  fi->velocityY = 60.0f;
+  fi->startY = initialHeight;         // Initial height above floor shadow (px)
+  fi->currentScreenY = initialHeight; // Current height remaining above floor shadow (px)
+  fi->targetLogicalX = targetLogicalX; // Logical room X
+  fi->targetLogicalY = targetLogicalY; // Logical room Y
+  fi->velocityY = 60.0f;               // Initial fall velocity
 
   // Release item from servant
   s->carriedItemId = 0;
@@ -950,17 +947,13 @@ void UpdateFallingItems(Game *game, float dt) {
     if (!fi->active)
       continue;
 
-    // Gravity acceleration on screen Y
+    // Gravity acceleration reducing height above floor shadow
     fi->velocityY += 450.0f * dt;
-    fi->currentScreenY += fi->velocityY * dt;
+    fi->currentScreenY -= fi->velocityY * dt;
 
-    // 100% constant vertical alignment on screen
-    fi->currentScreenX = fi->targetScreenX; // Always startX
-
-    // Landing check on floor Y
-    if (fi->currentScreenY >= fi->targetScreenY) {
-      fi->currentScreenY = fi->targetScreenY;
-      fi->currentScreenX = fi->targetScreenX;
+    // Landing check when height reaches zero (or below)
+    if (fi->currentScreenY <= 0.0f) {
+      fi->currentScreenY = 0.0f;
 
       // Register item on room floor at (targetLogicalX, targetLogicalY)
       bool itemFoundInRoom = false;
