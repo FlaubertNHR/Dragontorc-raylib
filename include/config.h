@@ -1,6 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// Debug Flags 
+#define DEBUG_HITBOX 0
+
 // Screen and display settings
 #define SCREEN_WIDTH               800
 #define SCREEN_HEIGHT              600
@@ -9,6 +12,7 @@
 
 #define FRAME_THICKNESS            (SCREEN_WIDTH / 16.0f) // Decorative outer frame (1/16 of the total width)
 #define HUD_HEIGHT                 (SCREEN_HEIGHT * 0.30f) // HUD height (30% of the total height)
+#define HUD_PARCHMENT_GAP          16.0f // HUD parchment top gap (margin between viewport floor line and parchment top)
 
 // Dimensions of the window/usable play area (Viewport)
 #define VIEWPORT_X                 FRAME_THICKNESS

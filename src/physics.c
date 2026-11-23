@@ -8,11 +8,11 @@ void ApplyBounce(Player *player, float dirX, float dirY) {
   if (impactSpeed < 0.15f) {
     player->moveRamp = 0.0f;
     return;
-  }    
+  }
   player->lastDirX = dirX;
   player->lastDirY = dirY;
   // Momentum of the rebound begins in proportion to the speed at which you collided
-  player->moveRamp = impactSpeed;  
+  player->moveRamp = impactSpeed;
   // Control-lockout duration scales in proportion to the shock intensity
   player->bounceLockoutTimer = BOUNCE_LOCKOUT_TIME * impactSpeed;
 }
@@ -196,7 +196,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
     if (!insideDoorway && (p->x + shadowRadiusX) > rightWallX) {
       p->x = rightWallX - shadowRadiusX;
       if (p->bounceLockoutTimer <= 0.0f) {
-        ApplyBounce(p, -p->lastDirX, -p->lastDirY *0.5);
+        ApplyBounce(p, -p->lastDirX, -p->lastDirY * 0.5);
       }
     }
   }
@@ -264,7 +264,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
 
         if (inLeafRangeScreen && prevY <= leafY + 2.0f) {
           if ((p->y + shadowFloorY) >= leafY) {
-            p->y = leafY - shadowFloorY; // <--- MODIFICADO: Retiene la sombra por delante del vano
+            p->y = leafY - shadowFloorY; 
           }
         }
       }
@@ -302,9 +302,9 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         if (inLeafRangeScreen && prevY >= leafY - 2.0f) {
           if ((p->y - shadowFloorY) <= leafY) {
             if (d->state == DOOR_OPEN || d->state == DOOR_OPENING) {
-              d->state = DOOR_CLOSING; // <--- MODIFICADO: Inicia el cierre de la puerta
+              d->state = DOOR_CLOSING; 
             }
-            p->y = leafY + shadowFloorY; // <--- MODIFICADO: Retiene a Maroc detras de la hoja mientras se cierra
+            p->y = leafY + shadowFloorY; 
           }
         }
       }
@@ -412,6 +412,10 @@ void UpdateServantPhysics(Game *game, float dt) {
   if (!s->active)
     return;
 
+  if (s->marocInteractionLockoutTimer > 0.0f) {
+    s->marocInteractionLockoutTimer -= dt;
+  }
+
   float moveX = 0.0f;
   float moveY = 0.0f;
 
@@ -434,48 +438,42 @@ void UpdateServantPhysics(Game *game, float dt) {
     s->screenX += moveX * s->speed * dt;
     s->screenY += moveY * s->speed * dt;
 
-    // 3. Absolute screen viewport padding (never leaves the display window)
-    const float screenPadding = 8.0f;
-    if (s->screenX < screenPadding)
-      s->screenX = screenPadding;
-    if (s->screenX > (SCREEN_WIDTH - screenPadding))
-      s->screenX = SCREEN_WIDTH - screenPadding;
-    if (s->screenY < screenPadding)
-      s->screenY = screenPadding;
-    if (s->screenY > (SCREEN_HEIGHT - screenPadding))
-      s->screenY = SCREEN_HEIGHT - screenPadding;
+    // Outer radius of the servant sprite circle (8.5f px in DrawServant)
+    const float servantRadius = 8.5f;
 
-    // 4. Vertical limits: front room floor threshold and top of the back wall
-    Vector2 frontFloorCenter = ProjectRoomPoint(0.0f, 4.0f, r->width);
-    float maxScreenBottom = frontFloorCenter.y + game->cameraScroll.y;
-    if (s->screenY > maxScreenBottom) {
-      s->screenY = maxScreenBottom;
-    }
-
-    Vector2 backWallBase =
-        ProjectRoomPoint(0.0f, r->length, r->width);
-    float minScreenTop =
-        (backWallBase.y - r->wallHeight) + game->cameraScroll.y;
+    // 3. Vertial screen limits
+    float minScreenTop = VIEWPORT_Y + servantRadius;
     if (s->screenY < minScreenTop) {
       s->screenY = minScreenTop;
     }
 
-    // 5 Horizontal limits
-    float leftFrontX = GetLeftWallX(0.0f, r->width, r->length);
-    float rightFrontX = GetRightWallX(0.0f, r->width, r->length);
-    Vector2 leftFrontCorner = ProjectRoomPoint(leftFrontX, 0.0f, r->width);
-    Vector2 rightFrontCorner = ProjectRoomPoint(rightFrontX, 0.0f, r->width);
-
-    float outermostLeftX = leftFrontCorner.x + game->cameraScroll.x;
-    float outermostRightX = rightFrontCorner.x + game->cameraScroll.x;
-
-    // Clamp the servant's screen position to these outermost vertical lines
-    if (s->screenX < outermostLeftX) {
-      s->screenX = outermostLeftX;
-    } else if (s->screenX > outermostRightX) {
-      s->screenX = outermostRightX;
+    // Bottom limit / Viewport exit check:
+    // The servant moves freely downwards past the bottom of the room floor.
+    // When its top edge goes past the bottom boundary of the viewport (VIEWPORT_Y + VIEWPORT_HEIGHT),
+    // it is completely clipped by ScissorMode (hidden behind the black bottom viewport strip).
+    // At this point, deactivate the servant and return control to Maroc.
+    float viewportBottom = VIEWPORT_Y + VIEWPORT_HEIGHT;
+    if ((s->screenY - servantRadius) >= viewportBottom) {
+      if (s->carriedItemId != 0) {
+        StartServantItemDrop(game);
+      }
+      game->servant.active = false;
+      game->controlMode = CONTROL_MAROC;
+      return;
     }
 
+    // 4. Horizontal limits: do not encroach upon the left or right side margins
+    float minScreenLeft = VIEWPORT_X + servantRadius;
+    float maxScreenRight = (VIEWPORT_X + VIEWPORT_WIDTH) - servantRadius;
+
+    if (s->screenX < minScreenLeft) {
+      s->screenX = minScreenLeft;
+    }
+    if (s->screenX > maxScreenRight) {
+      s->screenX = maxScreenRight;
+    }
+
+    // 5. Logical room coordinates mapping (x, y) for picking up / dropping items
     float localY = -(s->screenY - game->cameraScroll.y) / (PROJECTION_Y_FACTOR * PROJECTION_SCALE);
     if (localY < 4.0f)
       localY = 4.0f;
@@ -693,5 +691,307 @@ void UpdateItemPickups(Game *game) {
   }
   if (!standingOnLockoutItem) {
     p->pickupLockoutItemId = 0;
+  }
+}
+
+// =============================================================================
+// SERVANT ITEM PICKUP & MAROC INVENTORY INTERACTION (src/physics.c)
+// =============================================================================
+void UpdateServantItemInteraction(Game *game, float dt) {
+  (void)dt;
+  Servant *s = &game->servant;
+  Player *p = &game->player;
+  Room *r = &game->rooms[game->currentRoom];
+
+  if (!s->active)
+    return;
+
+  // 1. PRECISE POSITION OF MAROC’S TORSO / BODY ON SCREEN
+  // (Taking into account Maroc’s height and his current levitation)
+  float shadowScreenX = game->projectedPlayer.x + game->cameraScroll.x;
+  float shadowScreenY = game->projectedPlayer.y + game->cameraScroll.y;
+  float currentAltitude = p->z + p->floatingOffset;
+
+  // Visual center of Maroc’s body/torso (above the shadow on the ground)
+  float marocBodyCenterX = shadowScreenX;
+  float marocBodyCenterY = shadowScreenY - currentAltitude - (PLAYER_HEIGHT * 0.55f);
+
+  // 2. MAROC BODY HITBOX
+  // Tightly adjusted so that when the Servant is summoned (appearing above the player's head),
+  // it does not touch the player's body until the player intentionally moves it downward.  
+  float bodyWidth = 20.0f;  // Width of the torso contact area  
+  float bodyHeight = 20.0f; // Height of the torso contact area
+
+  float dx = s->screenX - marocBodyCenterX;
+  float dy = s->screenY - marocBodyCenterY;
+
+  bool isTouchingMaroc = (fabsf(dx) <= (bodyWidth * 0.5f)) &&
+                         (fabsf(dy) <= (bodyHeight * 0.5f));
+
+  // ID blocking to prevent repeated exchanges without leaving the contact zone
+  static int servantLockoutItemId = 0;
+
+  // If the Servant leaves Maroc’s body, the lock resets instantly.
+  if (!isTouchingMaroc) {
+    servantLockoutItemId = 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. EXCHANGE WITH MAROC (FIFO SYSTEM WITH ID-BASED LOCKING)
+  // ---------------------------------------------------------------------------
+  if (isTouchingMaroc) {
+    bool isLockedOut = false;
+
+    if (s->carriedItemId != 0 && s->carriedItemId == servantLockoutItemId) {
+      isLockedOut = true;
+    } else if (s->carriedItemId == 0 && servantLockoutItemId != 0) {
+      isLockedOut = true;
+    }
+
+    if (!isLockedOut) {
+      // CASE A: Servant with EMPTY hands -> Extracts the OLDEST object (slot 0)
+      if (s->carriedItemId == 0) {
+        if (p->inventoryCount > 0) {
+          Item oldestItem = p->inventory[0];
+
+          // Shift the remaining Maroc objects to the left in the HUD
+          for (int k = 0; k < p->inventoryCount - 1; k++) {
+            p->inventory[k] = p->inventory[k + 1];
+          }
+          p->inventory[p->inventoryCount - 1] = (Item){0};
+          p->inventoryCount--;
+
+          // The Servant receives the extracted object
+          s->carriedItem = oldestItem;
+          s->carriedItemId = oldestItem.id;
+          servantLockoutItemId = oldestItem.id; // Block this ID while it remains in contact
+          return;
+        }
+      }
+      // CASE B: Servant IS CARRYING AN OBJECT -> Hands it over to Maroc or performs a FIFO rotation
+      else {
+        int givenId = s->carriedItemId;
+
+        if (p->inventoryCount < MAX_INVENTORY_ITEMS) {
+          // Maroc has space (< 3): Place the object in the rightmost empty slot
+          p->inventory[p->inventoryCount] = s->carriedItem;
+          p->inventoryCount++;
+
+          s->carriedItemId = 0;
+          s->carriedItem = (Item){0};
+          servantLockoutItemId = givenId; // Blocks the provided ID as long as it remains in contact
+          return;
+        } else {
+          // Maroc Inventory FULL (3/3): FIFO ROTATION WITH SHIFTING
+          Item oldestItem = p->inventory[0];
+
+          // Shifts cells to the left
+          p->inventory[0] = p->inventory[1];
+          p->inventory[1] = p->inventory[2];
+
+          // The new object enters the cell on the right (position 2)
+          p->inventory[2] = s->carriedItem;
+
+          // The Servant keeps the oldest ejected object
+          s->carriedItem = oldestItem;
+          s->carriedItemId = oldestItem.id;
+          servantLockoutItemId = oldestItem.id; // Locks the received object
+          return;
+        }
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. COLLECTION OF ITEMS IN THE ROOM (Floor / Walls)
+  // ---------------------------------------------------------------------------
+  if (s->carriedItemId == 0 && !isTouchingMaroc) {
+    const float servantPickupRadius = 24.0f;
+    const float servantPickupRadiusSq = servantPickupRadius * servantPickupRadius;
+    Vector2 servantScreen = {s->screenX, s->screenY};
+
+    for (int i = 0; i < r->itemCount; i++) {
+      Item *item = &r->items[i];
+      if (!item->active)
+        continue;
+
+      Vector2 itemScreen;
+      if (item->isWallItem) {
+        if (item->wall == WALL_BACK) {
+          itemScreen = ProjectRoomPoint(item->x, r->length, r->width);
+        } else if (item->wall == WALL_LEFT) {
+          float wallX = GetLeftWallX(item->y, r->width, r->length);
+          itemScreen = ProjectRoomPoint(wallX, item->y, r->width);
+        } else {
+          float wallX = GetRightWallX(item->y, r->width, r->length);
+          itemScreen = ProjectRoomPoint(wallX, item->y, r->width);
+        }
+        itemScreen.y -= item->wallHeightOffset;
+      } else {
+        itemScreen = ProjectRoomPoint(item->x, item->y, r->width);
+      }
+      itemScreen.x += game->cameraScroll.x;
+      itemScreen.y += game->cameraScroll.y;
+
+      float idx = servantScreen.x - itemScreen.x;
+      float idy = servantScreen.y - itemScreen.y;
+      if ((idx * idx + idy * idy) <= servantPickupRadiusSq) {
+        s->carriedItem = *item;
+        s->carriedItemId = item->id;
+        item->active = false; // Object leaves the room 
+        break;
+      }
+    }
+  }
+}
+
+void StartServantItemDrop(Game *game) {
+  Servant *s = &game->servant;
+  Room *r = &game->rooms[game->currentRoom];
+
+  if (s->carriedItemId == 0)
+    return;
+
+  // 1. Find an available slot for the falling animation
+  int slot = -1;
+  for (int i = 0; i < MAX_FALLING_ITEMS; i++) {
+    if (!game->fallingItems[i].active) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot == -1)
+    slot = 0;
+
+  FallingItem *fi = &game->fallingItems[slot];
+
+  float startX = s->screenX;
+  float startY = s->screenY + 14.0f; // Held just beneath the servant’s sphere
+
+  // 2. Direct logical X-coordinate (NEVER MODIFIED OR CLAMPED IN X!)
+  float rawLogicalX = (startX - game->cameraScroll.x) / PROJECTION_SCALE;
+  float targetLogicalX = rawLogicalX;
+
+  float halfWidth = r->width * 0.5f;
+  const float marginX = 10.0f;
+  const float backMarginY = 30.0f;
+  const float frontMarginY = 10.0f;
+
+  // 3. Free fall on screen with random dispersion
+  float dropPx = 45.0f + (float)GetRandomValue(-25, 35);
+  float targetScreenY = startY + dropPx;
+
+  // Logical depth derived from screen position
+  float targetLogicalY = -(targetScreenY - game->cameraScroll.y) / (PROJECTION_Y_FACTOR * PROJECTION_SCALE);
+  targetLogicalY += (float)GetRandomValue(-15, 15);
+
+  float leftWallAtTarget = GetLeftWallX(targetLogicalY, r->width, r->length) + marginX;
+  float rightWallAtTarget = GetRightWallX(targetLogicalY, r->width, r->length) - marginX;
+
+  // 4. SIDE WALL GEOMETRY:
+  // If rawLogicalX lies on the left or right wall, we decrease the Y depth
+  // (moving toward the front of the room) to the precise point where the trapezoidal wall
+  // widens enough to accommodate rawLogicalX, without shifting its X position by even a single pixel.
+  if (rawLogicalX < leftWallAtTarget) {
+    // On the left wall: calculate the depth Y where the wall meets rawLogicalX
+    targetLogicalY = r->length - (-halfWidth + marginX - rawLogicalX) / SIDE_WALL_INCLINATION_SLOPE;
+  } else if (rawLogicalX > rightWallAtTarget) {
+    // On the right wall: calculate the depth Y where the wall meets rawLogicalX
+    targetLogicalY = r->length - (rawLogicalX + marginX - halfWidth) / SIDE_WALL_INCLINATION_SLOPE;
+  }
+
+  // 5. Y-axis depth clamping relative to the back and front of the room
+  if (targetLogicalY > (r->length - backMarginY)) {
+    targetLogicalY = r->length - backMarginY;
+  }
+  if (targetLogicalY < frontMarginY) {
+    targetLogicalY = frontMarginY;
+  }
+
+  // 6. On-screen projection of the final landing point
+  Vector2 targetProj = ProjectRoomPoint(targetLogicalX, targetLogicalY, r->width);
+  float targetScreenX = startX;
+  float targetScreenYCalculated = targetProj.y + game->cameraScroll.y;
+
+  if (targetScreenYCalculated < startY + 20.0f) {
+    targetScreenYCalculated = startY + 20.0f;
+  }
+
+  // 7. State of the FallingItem structure (X strictly fixed at startX / rawLogicalX)
+  fi->active = true;
+  fi->item = s->carriedItem;
+  fi->startX = startX;
+  fi->startY = startY;
+  fi->currentScreenX = startX;
+  fi->currentScreenY = startY;
+  fi->targetScreenX = startX; // X remains strictly constant during the animation 
+  fi->targetScreenY = targetScreenYCalculated;
+  fi->targetLogicalX = targetLogicalX; // Exactly rawLogicalX (with no deviation)
+  fi->targetLogicalY = targetLogicalY;
+  fi->velocityY = 60.0f;
+
+  // Releases the object carried by the servant
+  s->carriedItemId = 0;
+  s->carriedItem = (Item){0};
+}
+
+void UpdateFallingItems(Game *game, float dt) {
+  Room *r = &game->rooms[game->currentRoom];
+
+  for (int k = 0; k < MAX_FALLING_ITEMS; k++) {
+    FallingItem *fi = &game->fallingItems[k];
+    if (!fi->active)
+      continue;
+
+    // Gravitational acceleration along the Y-axis
+    fi->velocityY += 450.0f * dt;
+    fi->currentScreenY += fi->velocityY * dt;
+
+    // The X remains strictly vertical (with no horizontal drift)
+    fi->currentScreenX = fi->targetScreenX;
+
+    // Upon reaching the ground
+    if (fi->currentScreenY >= fi->targetScreenY) {
+      fi->currentScreenY = fi->targetScreenY;
+
+      // Registers the object on the room floor at (targetLogicalX, targetLogicalY)
+      bool itemFoundInRoom = false;
+      for (int i = 0; i < r->itemCount; i++) {
+        if (r->items[i].id == fi->item.id) {
+          r->items[i] = fi->item;
+          r->items[i].active = true;
+          r->items[i].isWallItem = false;
+          r->items[i].x = fi->targetLogicalX;
+          r->items[i].y = fi->targetLogicalY;
+          itemFoundInRoom = true;
+          break;
+        }
+      }
+
+      if (!itemFoundInRoom) {
+        bool slotFound = false;
+        for (int i = 0; i < r->itemCount; i++) {
+          if (!r->items[i].active) {
+            r->items[i] = fi->item;
+            r->items[i].active = true;
+            r->items[i].isWallItem = false;
+            r->items[i].x = fi->targetLogicalX;
+            r->items[i].y = fi->targetLogicalY;
+            slotFound = true;
+            break;
+          }
+        }
+        if (!slotFound && r->itemCount < MAX_ITEMS_PER_ROOM) {
+          r->items[r->itemCount] = fi->item;
+          r->items[r->itemCount].active = true;
+          r->items[r->itemCount].isWallItem = false;
+          r->items[r->itemCount].x = fi->targetLogicalX;
+          r->items[r->itemCount].y = fi->targetLogicalY;
+          r->itemCount++;
+        }
+      }
+
+      fi->active = false;
+    }
   }
 }

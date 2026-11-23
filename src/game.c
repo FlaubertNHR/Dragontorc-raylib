@@ -44,7 +44,7 @@ void InitGame(Game *game) {
 }
 
 void CloseGame(Game *game) {
-    if (game->frameTexture.id > 0) UnloadTexture(game->frameTexture); // Free texture
+  if (game->frameTexture.id > 0) UnloadTexture(game->frameTexture); // Free texture
 }
 
 static void UpdateGameCamera(Game *game) {
@@ -84,12 +84,16 @@ void UpdateGame(Game *game) {
       game->servant.screenY =
           shadowScreenY - PLAYER_HEIGHT - currentAltitude - SERVANT_HEAD_OFFSET;
     } else {
+      if (game->servant.carriedItemId != 0) {
+        StartServantItemDrop(game);
+      }
       game->controlMode = CONTROL_MAROC;
       game->servant.active = false;
     }
   }
 
   UpdateDoorAnimations(&game->rooms[game->currentRoom], dt);
+  UpdateFallingItems(game, dt);
   if (game->controlMode == CONTROL_MAROC) {
     float prevX = game->player.x;
     float prevY = game->player.y;
@@ -106,7 +110,8 @@ void UpdateGame(Game *game) {
 
     // Servant takes exclusive movement
     UpdateServantPhysics(game, dt);
-    UpdateServantDoorInteraction(game); // Chequeo de puertas del sirvient
+    UpdateServantDoorInteraction(game);
+    UpdateServantItemInteraction(game, dt);
   }
 
   UpdateGameCamera(game);
@@ -128,6 +133,7 @@ void RenderGame(const Game *game) {
     DrawDoorsBehind(room, player, game->cameraScroll);
 
     DrawRoomItems(room, game->cameraScroll);
+    DrawFallingItems(game);
 
     DrawPlayer(game);
     DrawDoorsInFront(room, player, game->cameraScroll);

@@ -11,5 +11,8 @@ void TransitionToRoom(Game *game, const Door *crossedDoor);
 void UpdateDoorAnimations(Room *room, float dt);
 void UpdateServantDoorInteraction(Game *game);
 void UpdateItemPickups(Game *game);
+void UpdateServantItemInteraction(Game *game, float dt);
+void StartServantItemDrop(Game *game); 
+void UpdateFallingItems(Game *game, float dt);
 
 #endif // PHYSICS_H

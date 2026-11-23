@@ -6,7 +6,7 @@ int LoadMapData(Room rooms[], int maxRooms) {
     if (maxRooms < 3) return 0;
 
     // =========================================================================
-    // SALA 0: Citadel Entrance
+    // ROOM 0: Citadel Entrance
     // =========================================================================
     rooms[0] = (Room){
         .width = 360.0f,
@@ -21,14 +21,14 @@ int LoadMapData(Room rooms[], int maxRooms) {
         },
         .doorCount = 3,
     .items = {
-        // Objeto colgado justo en el centro de la pared trasera
+        // Object hung right in the center of the back wall
         WALL_ITEM_BACK(103, ITEM_TYPE_CROWN, "Crown of Dumnonia", POS_CENTER, 65.0f, YELLOW),
 
-        // Pareja de objetos en el suelo colocados de forma simétrica a la izquierda y derecha (-80 y +80)
+        // Pair of objects on the ground, positioned symmetrically to the left and right (-80 and +80)
         FLOOR_ITEM(101, ITEM_TYPE_KEY,    "Iron Key",     POS_LEFT(80.0f),  80.0f, GOLD),
         FLOOR_ITEM(102, ITEM_TYPE_SCROLL, "Spell Scroll", POS_RIGHT(80.0f), 80.0f, SKYBLUE),
 
-        // Antorchas / Candelabros flanqueando la puerta trasera (+- 50 unidades del centro de la puerta)
+        // Torches / Candelabra flanking the back door (approx. 50 units from the center of the door)
         WALL_ITEM_BACK(107, ITEM_TYPE_ARTIFACT, "Torch Left",  FLANK_LEFT(POS_CENTER, 50.0f),  50.0f, ORANGE),
         WALL_ITEM_BACK(108, ITEM_TYPE_ARTIFACT, "Torch Right", FLANK_RIGHT(POS_CENTER, 50.0f), 50.0f, ORANGE)
     },
@@ -37,7 +37,7 @@ int LoadMapData(Room rooms[], int maxRooms) {
 
     
     // =========================================================================
-    // SALA 1: West Corridor
+    // ROOM 1: West Corridor
     // =========================================================================
     rooms[1] = (Room){
         .width = 240.0f,
@@ -59,7 +59,7 @@ int LoadMapData(Room rooms[], int maxRooms) {
     };
 
     // =========================================================================
-    // SALA 2: The Crossroads
+    // ROOM 2: The Crossroads
     // =========================================================================
     rooms[2] = (Room){
         .width = 560.0f,

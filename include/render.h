@@ -12,5 +12,6 @@ void DrawServant(const Servant *s, float roomWidth, Vector2 scroll, const Game *
 void DrawHUD(const Game *game);
 void DrawRoomItems(const Room *room, Vector2 scroll);
 void DrawDecorativeFrame(const Game *game);
+void DrawFallingItems(const Game *game);
 
 #endif // RENDER_H

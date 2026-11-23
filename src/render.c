@@ -192,7 +192,7 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
   float yFront = door->position - (door->width / 2.0f);
   float yBack = door->position + (door->width / 2.0f);
   float xWallFront = (door->wall == WALL_LEFT) ? GetLeftWallX(yFront, room->width, room->length) : GetRightWallX(yFront, room->width, room->length);
-  float xWallBack  = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width, room->length)  : GetRightWallX(yBack, room->width, room->length);
+  float xWallBack = (door->wall == WALL_LEFT) ? GetLeftWallX(yBack, room->width, room->length) : GetRightWallX(yBack, room->width, room->length);
 
   Vector2 baseFront = ProjectRoomPoint(xWallFront, yFront, room->width);
   Vector2 baseBack = ProjectRoomPoint(xWallBack, yBack, room->width);
@@ -262,11 +262,11 @@ static void DrawSideDoor(const Door *door, const Room *room, Vector2 scroll) {
     Color doorLeafColor = door->color;
     // Correct Counter-Clockwise (CCW) vertex ordering for both side walls
     if (door->wall == WALL_LEFT) {
-        DrawTriangle(hingeBottom, edgeBottom, hingeTop, doorLeafColor);
-        DrawTriangle(hingeTop, edgeBottom, edgeTop, doorLeafColor);
-    } else {    
-        DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
-        DrawTriangle(hingeTop, edgeTop, edgeBottom, doorLeafColor);
+      DrawTriangle(hingeBottom, edgeBottom, hingeTop, doorLeafColor);
+      DrawTriangle(hingeTop, edgeBottom, edgeTop, doorLeafColor);
+    } else {
+      DrawTriangle(hingeBottom, hingeTop, edgeBottom, doorLeafColor);
+      DrawTriangle(hingeTop, edgeTop, edgeBottom, doorLeafColor);
     }
 
     // Door leaf outline & handle knob
@@ -300,7 +300,7 @@ static bool IsDoorInFrontOfPlayer(const Door *door, const Room *room,
   // Side doors (WALL_LEFT & WALL_RIGHT)
   // Front edge of the doorway frame is at yFront
   float yFront = door->position - (door->width / 2.0f);
-  
+
   // Horizontal span reach of the door leaf extending into the room floor
   float leafReachX = door->height * 1.2f;
 
@@ -334,7 +334,7 @@ static bool IsLeafInFrontOfPlayer(const Door *door, const Room *room,
   float yBack = door->position + (door->width / 2.0f);
   float leafSpan = door->height * 0.75f;
 
-  float leftWallX  = GetLeftWallX(player->y, room->width, room->length);
+  float leftWallX = GetLeftWallX(player->y, room->width, room->length);
   float rightWallX = GetRightWallX(player->y, room->width, room->length);
 
   if (door->wall == WALL_LEFT) {
@@ -399,6 +399,28 @@ void DrawPlayer(const Game *game) {
   DrawRectangle(shadowPos.x - PLAYER_WIDTH / 2.0f,
                 shadowPos.y - PLAYER_HEIGHT - totalAltitude, PLAYER_WIDTH,
                 PLAYER_HEIGHT, WHITE);
+
+#if DEBUG_HITBOX 
+  // --- VISUAL INDICATOR FOR THE EXCHANGE HITBOX (DEBUG) ---
+  float bodyWidth = 20.0f;
+  float bodyHeight = 14.0f;
+
+  float marocBodyCenterX = shadowPos.x;
+  float marocBodyCenterY = shadowPos.y - totalAltitude - (PLAYER_HEIGHT * 0.55f);
+
+  Rectangle hitBox = {
+      marocBodyCenterX - (bodyWidth * 0.5f),
+      marocBodyCenterY - (bodyHeight * 0.5f),
+      bodyWidth,
+      bodyHeight
+  };
+
+  // Semi-transparent red box and yellow dot in the center of the torso
+  DrawRectangleRec(hitBox, (Color){255, 0, 0, 110});
+  DrawRectangleLinesEx(hitBox, 1.5f, RED);
+  DrawCircleV((Vector2){marocBodyCenterX, marocBodyCenterY}, 2.0f, YELLOW);
+
+#endif
 }
 
 // Static helper to render retro vector item icons (Key, Scroll, Crown, Treasure, Artifact)
@@ -457,7 +479,7 @@ static void DrawItemSprite(ItemCategory category, Vector2 centerPos,
   }
 }
 void DrawRoomItems(const Room *room, Vector2 scroll) {
-for (int i = 0; i < room->itemCount; i++) {
+  for (int i = 0; i < room->itemCount; i++) {
     const Item *item = &room->items[i];
     if (!item->active)
       continue;
@@ -508,6 +530,12 @@ void DrawServant(const Servant *servant, float roomWidth, Vector2 cameraScroll,
 
   DrawCircleV((Vector2){servantCenter.x - 3, servantCenter.y - 2}, 1.5f, BLACK);
   DrawCircleV((Vector2){servantCenter.x + 3, servantCenter.y - 2}, 1.5f, BLACK);
+
+  // Render carried item floating attached right below servant
+  if (servant->carriedItemId != 0 && servant->carriedItem.id != 0) {
+    Vector2 itemPos = {servantCenter.x, servantCenter.y + 14.0f};
+    DrawItemSprite(servant->carriedItem.category, itemPos, 0.85f, servant->carriedItem.color);
+  }
 }
 
 void DrawHUD(const Game *game) {
@@ -515,16 +543,16 @@ void DrawHUD(const Game *game) {
 
   // Base coordinates for HUD parchment (positioned behind the decorative frame)
   float hudX = FRAME_THICKNESS;
-  float hudY = SCREEN_HEIGHT - HUD_HEIGHT;
+  float hudY = (SCREEN_HEIGHT - HUD_HEIGHT) + HUD_PARCHMENT_GAP;
   float hudWidth = VIEWPORT_WIDTH;
-  float hudHeight = HUD_HEIGHT;
+  float hudHeight = HUD_HEIGHT - HUD_PARCHMENT_GAP;
 
   // --- 1. PROCEDURAL PARCHMENT RENDERING (DRAGONTORC RETRO STYLE) ---
-  Color parchmentBg     = (Color){228, 196, 76, 255}; // Golden parchment background
+  Color parchmentBg = (Color){228, 196, 76, 255};     // Golden parchment background
   Color parchmentShadow = (Color){195, 160, 50, 255}; // Rolled edge shadow
   Color parchmentBorder = (Color){70, 45, 10, 255};   // Dark brown ink outline
-  Color inkColor        = (Color){40, 20, 5, 255};    // Primary ink text
-  Color inkSubtle       = (Color){90, 60, 20, 255};   // Secondary ink text
+  Color inkColor = (Color){40, 20, 5, 255};           // Primary ink text
+  Color inkSubtle = (Color){90, 60, 20, 255};         // Secondary ink text
 
   // Main parchment body
   DrawRectangle((int)hudX, (int)hudY, (int)hudWidth, (int)hudHeight, parchmentBg);
@@ -545,8 +573,8 @@ void DrawHUD(const Game *game) {
   DrawRectangleLinesEx((Rectangle){hudX + 8, hudY + 16, hudWidth - 16, hudHeight - 32}, 2.0f, parchmentBorder);
 
   // --- 2. INTERNAL SAFE MARGINS (PREVENT OVERLAP WITH FRAME) ---
-  float safeLeft = hudX + 45.0f;        // X = 95px (Wide left margin)
-  float safeTop  = hudY + 28.0f;        // Y = 448px (Padded from top scroll edge)
+  float safeLeft = hudX + 45.0f; // X = 95px (Wide left margin)
+  float safeTop = hudY + 28.0f;  // Y = 448px (Padded from top scroll edge)
 
   // --- 3. HUD CONTENT & TEXT LAYOUT ---
   // Column 1: Room Info (Left)
@@ -557,7 +585,7 @@ void DrawHUD(const Game *game) {
            (int)safeLeft, (int)safeTop + 48, 14, inkSubtle);
 
   // Column 2: Control & Servant Status (Center)
-  float col2X = safeLeft + 230.0f;      // X = 325px
+  float col2X = safeLeft + 230.0f; // X = 325px
   DrawText("CONTROL MODE", (int)col2X, (int)safeTop, 12, inkSubtle);
 
   if (game->controlMode == CONTROL_MAROC) {
@@ -568,19 +596,16 @@ void DrawHUD(const Game *game) {
     DrawText("[S] Return to Maroc", (int)col2X, (int)safeTop + 36, 12, inkSubtle);
   }
 
-  if (game->servant.active) {
-    if (game->servant.carriedItemId != 0) {
-      DrawText(TextFormat("Servant: Carrying Item #%d", game->servant.carriedItemId),
-               (int)col2X, (int)safeTop + 56, 12, (Color){20, 70, 140, 255});
-    } else {
-      DrawText("Servant: Active (Empty hands)", (int)col2X, (int)safeTop + 56, 12, (Color){20, 70, 140, 255});
-    }
+  if (game->servant.carriedItemId != 0) {
+    const char *itemName = (game->servant.carriedItem.name != NULL) ? game->servant.carriedItem.name : "Item";
+    DrawText(TextFormat("Servant: Carrying %s", itemName),
+             (int)col2X, (int)safeTop + 56, 12, (Color){20, 70, 140, 255});
   } else {
-    DrawText("Servant: Inactive", (int)col2X, (int)safeTop + 56, 12, inkSubtle);
+    DrawText("Servant: Active (Empty hands)", (int)col2X, (int)safeTop + 56, 12, (Color){20, 70, 140, 255});
   }
 
   // Column 3: Maroc Inventory (Right)
-  float invStartX = safeLeft + 450.0f;  // X = 545px (Ends at X = 689px)
+  float invStartX = safeLeft + 450.0f; // X = 545px (Ends at X = 689px)
   DrawText("MAROC INVENTORY", (int)invStartX, (int)safeTop, 12, inkSubtle);
 
   for (int i = 0; i < MAX_INVENTORY_ITEMS; i++) {
@@ -595,5 +620,38 @@ void DrawHUD(const Game *game) {
       Vector2 iconCenter = {slotRect.x + 21.0f, slotRect.y + 21.0f};
       DrawItemSprite(invItem->category, iconCenter, 0.95f, invItem->color);
     }
+  }
+}
+
+void DrawFallingItems(const Game *game) {
+  for (int k = 0; k < MAX_FALLING_ITEMS; k++) {
+    const FallingItem *fi = &game->fallingItems[k];
+    if (!fi->active)
+      continue;
+
+    // 1. Fall progress (0.0 in the air -> 1.0 on the ground)
+    float startY = fi->targetScreenY - 45.0f;
+    float totalDist = fi->targetScreenY - startY;
+    float progress = 0.0f;
+    if (totalDist > 0.01f) {
+      progress = (fi->currentScreenY - startY) / totalDist;
+    }
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
+    // 2. Shadow cast on the floor of the room
+    Vector2 shadowFloorProj = ProjectRoomPoint(fi->targetLogicalX, fi->targetLogicalY, game->rooms[game->currentRoom].width);
+    float shadowScreenX = shadowFloorProj.x + game->cameraScroll.x;
+    float shadowScreenY = shadowFloorProj.y + game->cameraScroll.y;
+
+    float shadowRadiusX = 4.0f + progress * 3.5f;
+    float shadowRadiusY = (4.0f + progress * 3.5f) * 0.5f;
+    unsigned char alpha = (unsigned char)(30 + progress * 80);
+    DrawEllipse((int)shadowScreenX, (int)shadowScreenY,
+                shadowRadiusX, shadowRadiusY, (Color){255, 255, 255, 85});
+
+    // 3. The sprite falls at the exact vertical position on the screen (currentScreenX)
+    Vector2 spritePos = {fi->currentScreenX, fi->currentScreenY};
+    DrawItemSprite(fi->item.category, spritePos, 0.85f, fi->item.color);
   }
 }
