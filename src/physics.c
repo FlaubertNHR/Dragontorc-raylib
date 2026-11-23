@@ -264,7 +264,7 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
 
         if (inLeafRangeScreen && prevY <= leafY + 2.0f) {
           if ((p->y + shadowFloorY) >= leafY) {
-            p->y = leafY - shadowFloorY; 
+            p->y = leafY - shadowFloorY;
           }
         }
       }
@@ -302,9 +302,9 @@ void UpdateCollisions(Game *game, float prevX, float prevY, float moveX,
         if (inLeafRangeScreen && prevY >= leafY - 2.0f) {
           if ((p->y - shadowFloorY) <= leafY) {
             if (d->state == DOOR_OPEN || d->state == DOOR_OPENING) {
-              d->state = DOOR_CLOSING; 
+              d->state = DOOR_CLOSING;
             }
-            p->y = leafY + shadowFloorY; 
+            p->y = leafY + shadowFloorY;
           }
         }
       }
@@ -571,7 +571,7 @@ void UpdateServantDoorInteraction(Game *game) {
   Servant *s = &game->servant;
   Room *r = &game->rooms[game->currentRoom];
 
-  if (!s->active)
+  if (!s->active || s->carriedItemId != 0)
     return;
 
   Vector2 servantCenter = {s->screenX, s->screenY};
@@ -718,8 +718,8 @@ void UpdateServantItemInteraction(Game *game, float dt) {
 
   // 2. MAROC BODY HITBOX
   // Tightly adjusted so that when the Servant is summoned (appearing above the player's head),
-  // it does not touch the player's body until the player intentionally moves it downward.  
-  float bodyWidth = 20.0f;  // Width of the torso contact area  
+  // it does not touch the player's body until the player intentionally moves it downward.
+  float bodyWidth = 20.0f;  // Width of the torso contact area
   float bodyHeight = 20.0f; // Height of the torso contact area
 
   float dx = s->screenX - marocBodyCenterX;
@@ -838,7 +838,7 @@ void UpdateServantItemInteraction(Game *game, float dt) {
       if ((idx * idx + idy * idy) <= servantPickupRadiusSq) {
         s->carriedItem = *item;
         s->carriedItemId = item->id;
-        item->active = false; // Object leaves the room 
+        item->active = false; // Object leaves the room
         break;
       }
     }
@@ -928,8 +928,8 @@ void StartServantItemDrop(Game *game) {
   // 8. Populate falling item structure (anchored to room world coordinates)
   fi->active = true;
   fi->item = s->carriedItem;
-  fi->startY = initialHeight;         // Initial height above floor shadow (px)
-  fi->currentScreenY = initialHeight; // Current height remaining above floor shadow (px)
+  fi->startY = initialHeight;          // Initial height above floor shadow (px)
+  fi->currentScreenY = initialHeight;  // Current height remaining above floor shadow (px)
   fi->targetLogicalX = targetLogicalX; // Logical room X
   fi->targetLogicalY = targetLogicalY; // Logical room Y
   fi->velocityY = 60.0f;               // Initial fall velocity
@@ -955,44 +955,52 @@ void UpdateFallingItems(Game *game, float dt) {
     if (fi->currentScreenY <= 0.0f) {
       fi->currentScreenY = 0.0f;
 
-      // Register item on room floor at (targetLogicalX, targetLogicalY)
-      bool itemFoundInRoom = false;
-      for (int i = 0; i < r->itemCount; i++) {
-        if (r->items[i].id == fi->item.id) {
-          r->items[i] = fi->item;
-          r->items[i].active = true;
-          r->items[i].isWallItem = false;
-          r->items[i].x = fi->targetLogicalX;
-          r->items[i].y = fi->targetLogicalY;
-          itemFoundInRoom = true;
-          break;
-        }
-      }
+      // Small elastic rebound if impact velocity is significant
+      const float bounceThresholdSpeed = 60.0f;
+      const float restitution = 0.35f;
 
-      if (!itemFoundInRoom) {
-        bool slotFound = false;
+      if (fi->velocityY > bounceThresholdSpeed) {
+        fi->velocityY = -fi->velocityY * restitution;
+      } else {
+        // Register item on room floor at (targetLogicalX, targetLogicalY)
+        bool itemFoundInRoom = false;
         for (int i = 0; i < r->itemCount; i++) {
-          if (!r->items[i].active) {
+          if (r->items[i].id == fi->item.id) {
             r->items[i] = fi->item;
             r->items[i].active = true;
             r->items[i].isWallItem = false;
             r->items[i].x = fi->targetLogicalX;
             r->items[i].y = fi->targetLogicalY;
-            slotFound = true;
+            itemFoundInRoom = true;
             break;
           }
         }
-        if (!slotFound && r->itemCount < MAX_ITEMS_PER_ROOM) {
-          r->items[r->itemCount] = fi->item;
-          r->items[r->itemCount].active = true;
-          r->items[r->itemCount].isWallItem = false;
-          r->items[r->itemCount].x = fi->targetLogicalX;
-          r->items[r->itemCount].y = fi->targetLogicalY;
-          r->itemCount++;
-        }
-      }
 
-      fi->active = false;
+        if (!itemFoundInRoom) {
+          bool slotFound = false;
+          for (int i = 0; i < r->itemCount; i++) {
+            if (!r->items[i].active) {
+              r->items[i] = fi->item;
+              r->items[i].active = true;
+              r->items[i].isWallItem = false;
+              r->items[i].x = fi->targetLogicalX;
+              r->items[i].y = fi->targetLogicalY;
+              slotFound = true;
+              break;
+            }
+          }
+          if (!slotFound && r->itemCount < MAX_ITEMS_PER_ROOM) {
+            r->items[r->itemCount] = fi->item;
+            r->items[r->itemCount].active = true;
+            r->items[r->itemCount].isWallItem = false;
+            r->items[r->itemCount].x = fi->targetLogicalX;
+            r->items[r->itemCount].y = fi->targetLogicalY;
+            r->itemCount++;
+          }
+        }
+
+        fi->active = false;
+      }
     }
   }
 }
