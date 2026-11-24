@@ -47,14 +47,30 @@ void UpdatePlayerPhysics(Game *game, float *outMoveX, float *outMoveY,
       moveX *= DIAGONAL_FACTOR_X;
     }
     float length = sqrtf(moveX * moveX + moveY * moveY);
-    dirX = moveX / length;
-    dirY = moveY / length;
+    float inputDirX = moveX / length;
+    float inputDirY = moveY / length;    
 
-    p->lastDirX = dirX;
-    p->lastDirY = dirY;
+    // Detect direction reversal on either axis while player has levitation momentum
+    bool isReversingX = (p->lastDirX * inputDirX < 0.0f);
+    bool isReversingY = (p->lastDirY * inputDirY < 0.0f);
 
-    p->moveRamp += dt / ACCELERATION_TIME;
-    if (p->moveRamp > 1.0f) p->moveRamp = 1.0f;
+    if (p->moveRamp > 0.0f && (isReversingX || isReversingY)) {
+      // Smooth inertia deceleration and landing in the previous direction before turning
+      p->moveRamp -= dt / DECELERATION_TIME;
+      if (p->moveRamp < 0.0f) p->moveRamp = 0.0f;
+      dirX = p->lastDirX;
+      dirY = p->lastDirY;
+    } else {
+      // Normal acceleration / transition into new direction
+      p->lastDirX = inputDirX;
+      p->lastDirY = inputDirY;
+      dirX = inputDirX;
+      dirY = inputDirY;
+
+      p->moveRamp += dt / ACCELERATION_TIME;
+      if (p->moveRamp > 1.0f) p->moveRamp = 1.0f;
+    }
+ 
   } else {
     p->moveRamp -= dt / DECELERATION_TIME;
     if (p->moveRamp < 0.0f) p->moveRamp = 0.0f;
